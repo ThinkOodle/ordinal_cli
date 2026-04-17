@@ -2,8 +2,14 @@ package cmd
 
 import (
 	"bytes"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/ordinal-cli/ordinal/internal/client"
+	"github.com/spf13/pflag"
 )
 
 // TestPostCreate_RequiresTitlePublishAtStatus locks in the client-side
@@ -82,6 +88,83 @@ func TestPostList_RejectsLimitOutOfRange(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPostUpdate_ClearsLabelsWithEmptyFlag locks in that an explicit
+// --label-ids "" on update serializes to an empty JSON array, not null.
+// The API distinguishes "don't touch labels" (key absent) from "clear all
+// labels" (key present with []); sending null depends on undocumented
+// server handling and is rejected outright by many validators.
+func TestPostUpdate_ClearsLabelsWithEmptyFlag(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ORDINAL_API_KEY", "test-key")
+	t.Setenv("ORDINAL_OUTPUT_FORMAT", "")
+	t.Setenv("ORDINAL_VERBOSE", "")
+
+	var captured []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+
+	prev := testClientOpts
+	testClientOpts = []client.Option{
+		client.WithBaseURL(server.URL),
+		client.WithHTTPClient(server.Client()),
+	}
+	defer func() { testClientOpts = prev }()
+
+	tests := []struct {
+		name     string
+		labelArg string
+	}{
+		{"empty string", ""},
+		{"just commas", ","},
+		{"whitespace entries", "  ,  "},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			captured = nil
+			resetPostUpdateFlags(t)
+
+			var buf bytes.Buffer
+			rootCmd.SetOut(&buf)
+			rootCmd.SetErr(&buf)
+			rootCmd.SetArgs([]string{"post", "update", "--id", "p-1", "--label-ids", tc.labelArg})
+
+			if err := rootCmd.Execute(); err != nil {
+				t.Fatalf("post update: %v", err)
+			}
+			if !strings.Contains(string(captured), `"labelIds":[]`) {
+				t.Errorf("expected labelIds:[] in body, got: %s", captured)
+			}
+			if strings.Contains(string(captured), `"labelIds":null`) {
+				t.Errorf("labelIds must not marshal as null: %s", captured)
+			}
+		})
+	}
+}
+
+// resetPostUpdateFlags clears postUpdateCmd's package-level flag variables
+// and the pflag "changed" bits so consecutive Execute calls on the shared
+// rootCmd don't leak state between tests.
+func resetPostUpdateFlags(t *testing.T) {
+	t.Helper()
+	postID = ""
+	postUpdateTitle = ""
+	postUpdatePublishAt = ""
+	postUpdateStatus = ""
+	postUpdateLabelIDs = ""
+	postUpdateCampaignID = ""
+	postUpdateNotes = ""
+	postUpdateBodyJSON = ""
+	postUpdateBodyFile = ""
+	postUpdateCmd.Flags().VisitAll(func(f *pflag.Flag) {
+		f.Changed = false
+	})
 }
 
 // resetPostCreateFlags resets the package-level flag variables that

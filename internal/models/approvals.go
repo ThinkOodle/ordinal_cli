@@ -23,11 +23,18 @@ type Approval struct {
 }
 
 // ApprovalRequestInput is a single approval request for a post.
+//
+// IsBlocking is a *bool rather than bool so the CLI can distinguish three
+// cases the API treats differently: the caller explicitly requested a
+// blocking approval (true), explicitly requested a non-blocking approval
+// (false), or left the field off entirely and expects server defaulting.
+// A plain bool with omitempty collapses the explicit-false case into the
+// "omitted" case on the wire.
 type ApprovalRequestInput struct {
 	UserID     string `json:"userId"`
 	Message    string `json:"message,omitempty"`
 	DueDate    string `json:"dueDate,omitempty"`
-	IsBlocking bool   `json:"isBlocking,omitempty"`
+	IsBlocking *bool  `json:"isBlocking,omitempty"`
 }
 
 // CreateApprovalsRequest is the request body for creating post approvals.

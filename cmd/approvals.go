@@ -80,12 +80,21 @@ var approvalCreateCmd = &cobra.Command{
 				return err
 			}
 		} else if approvalCreateUserIDs != "" {
+			// Only forward isBlocking when the caller set it explicitly. An
+			// unset flag should produce an omitted key (server default); an
+			// explicit --blocking=false must send false, not fall through to
+			// the same omitted-key path as "not set".
+			var isBlocking *bool
+			if cmd.Flags().Changed("blocking") {
+				v := approvalCreateBlocking
+				isBlocking = &v
+			}
 			for _, uid := range splitCSV(approvalCreateUserIDs) {
 				req.Approvals = append(req.Approvals, models.ApprovalRequestInput{
 					UserID:     uid,
 					Message:    approvalCreateMessage,
 					DueDate:    approvalCreateDueDate,
-					IsBlocking: approvalCreateBlocking,
+					IsBlocking: isBlocking,
 				})
 			}
 		}

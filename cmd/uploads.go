@@ -79,6 +79,15 @@ func printRawJSON(data []byte) error {
 	if err := json.Unmarshal(data, &v); err != nil {
 		return fmt.Errorf("parsing response: %w", err)
 	}
+	// A legitimate {} from a read endpoint must render as "{}" across
+	// every output format. The table/CSV formatter deliberately collapses
+	// empty objects to "No results" / empty body (mutation acks need
+	// that), so intercept here to keep the read-path promise that {}
+	// passes through unchanged — regardless of --output.
+	if m, ok := v.(map[string]interface{}); ok && len(m) == 0 {
+		fmt.Println("{}")
+		return nil
+	}
 	return printResult(v)
 }
 

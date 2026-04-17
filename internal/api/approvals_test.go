@@ -42,10 +42,11 @@ func TestApprovalService_Create(t *testing.T) {
 		return jsonResponse(t, http.StatusOK, map[string]interface{}{"approvals": []map[string]string{{"id": "a1"}}}), nil
 	}))
 
+	blocking := true
 	_, err := svc.Create(models.CreateApprovalsRequest{
 		PostID: "p1",
 		Approvals: []models.ApprovalRequestInput{
-			{UserID: "u1", IsBlocking: true},
+			{UserID: "u1", IsBlocking: &blocking},
 		},
 	})
 	if err != nil {

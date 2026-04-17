@@ -215,7 +215,14 @@ var ideaUpdateCmd = &cobra.Command{
 			body["title"] = ideaUpdateTitle
 		}
 		if cmd.Flags().Changed("label-ids") {
-			body["labelIds"] = splitCSV(ideaUpdateLabelIDs)
+			// An explicit --label-ids "" (or "," / "  ") on update is the
+			// "clear all labels" signal. splitCSV returns nil for those, which
+			// marshals as JSON null; force an empty slice so the API sees [].
+			labels := splitCSV(ideaUpdateLabelIDs)
+			if labels == nil {
+				labels = []string{}
+			}
+			body["labelIds"] = labels
 		}
 		if cmd.Flags().Changed("campaign-id") {
 			body["campaignId"] = ideaUpdateCampaignID

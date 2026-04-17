@@ -271,7 +271,14 @@ var postUpdateCmd = &cobra.Command{
 			body["status"] = postUpdateStatus
 		}
 		if cmd.Flags().Changed("label-ids") {
-			body["labelIds"] = splitCSV(postUpdateLabelIDs)
+			// An explicit --label-ids "" (or "," / "  ") on update is the
+			// "clear all labels" signal. splitCSV returns nil for those, which
+			// marshals as JSON null; force an empty slice so the API sees [].
+			labels := splitCSV(postUpdateLabelIDs)
+			if labels == nil {
+				labels = []string{}
+			}
+			body["labelIds"] = labels
 		}
 		if cmd.Flags().Changed("campaign-id") {
 			body["campaignId"] = postUpdateCampaignID

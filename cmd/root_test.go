@@ -295,6 +295,53 @@ func TestPrintRawJSON_EmptyObjectPassesThrough(t *testing.T) {
 	}
 }
 
+// TestPrintRawJSON_EmptyObjectRendersLiteralAcrossFormats locks in the
+// read-path promise that a legitimate {} response renders as "{}" under
+// every output format. The formatter deliberately collapses empty objects
+// to "No results" (table) or an empty body (CSV) because mutation acks
+// want that; read endpoints want fidelity, so printRawJSON must intercept
+// before handing {} to the formatter. Covers table and CSV specifically:
+// the existing JSON-only assertion doesn't exercise the formatter path
+// where the bug lived.
+func TestPrintRawJSON_EmptyObjectRendersLiteralAcrossFormats(t *testing.T) {
+	prev := appConfig
+	t.Cleanup(func() { appConfig = prev })
+
+	for _, format := range []string{"json", "table", "csv"} {
+		t.Run(format, func(t *testing.T) {
+			r, w, err := os.Pipe()
+			if err != nil {
+				t.Fatalf("pipe: %v", err)
+			}
+			origStdout := os.Stdout
+			os.Stdout = w
+
+			appConfig = &config.Config{OutputFormat: format}
+			if err := printRawJSON([]byte("{}")); err != nil {
+				os.Stdout = origStdout
+				t.Fatalf("printRawJSON: %v", err)
+			}
+			if err := w.Close(); err != nil {
+				os.Stdout = origStdout
+				t.Fatalf("close: %v", err)
+			}
+			os.Stdout = origStdout
+
+			var buf bytes.Buffer
+			if _, err := buf.ReadFrom(r); err != nil {
+				t.Fatalf("read: %v", err)
+			}
+			got := strings.TrimSpace(buf.String())
+			if got != "{}" {
+				t.Errorf("format=%s: expected literal {} on stdout; got %q", format, buf.String())
+			}
+			if strings.Contains(buf.String(), "No results") {
+				t.Errorf("format=%s: table/csv must not collapse {} to 'No results': %q", format, buf.String())
+			}
+		})
+	}
+}
+
 // TestPrintMutationAck_EmptyResponsesAck locks in that create/update/delete
 // endpoints that answer with an empty body OR {} still produce a structured
 // acknowledgement. This is the other half of the read/mutation split: mutation

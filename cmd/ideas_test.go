@@ -2,8 +2,14 @@ package cmd
 
 import (
 	"bytes"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/ordinal-cli/ordinal/internal/client"
+	"github.com/spf13/pflag"
 )
 
 // TestIdeaCreate_RequiresNonEmptyTitle locks in the client-side title
@@ -112,4 +118,77 @@ func resetIdeaCreateFlags(t *testing.T) {
 	ideaCreateCampaignID = ""
 	ideaCreateBodyJSON = ""
 	ideaCreateBodyFile = ""
+}
+
+// TestIdeaUpdate_ClearsLabelsWithEmptyFlag is the idea-update parity of
+// TestPostUpdate_ClearsLabelsWithEmptyFlag. An explicit --label-ids "" must
+// serialize as an empty JSON array so the API sees "clear all labels"
+// rather than a null that some validators reject outright.
+func TestIdeaUpdate_ClearsLabelsWithEmptyFlag(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ORDINAL_API_KEY", "test-key")
+	t.Setenv("ORDINAL_OUTPUT_FORMAT", "")
+	t.Setenv("ORDINAL_VERBOSE", "")
+
+	var captured []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+
+	prev := testClientOpts
+	testClientOpts = []client.Option{
+		client.WithBaseURL(server.URL),
+		client.WithHTTPClient(server.Client()),
+	}
+	defer func() { testClientOpts = prev }()
+
+	tests := []struct {
+		name     string
+		labelArg string
+	}{
+		{"empty string", ""},
+		{"just commas", ","},
+		{"whitespace entries", "  ,  "},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			captured = nil
+			resetIdeaUpdateFlags(t)
+
+			var buf bytes.Buffer
+			rootCmd.SetOut(&buf)
+			rootCmd.SetErr(&buf)
+			rootCmd.SetArgs([]string{"idea", "update", "--id", "i-1", "--label-ids", tc.labelArg})
+
+			if err := rootCmd.Execute(); err != nil {
+				t.Fatalf("idea update: %v", err)
+			}
+			if !strings.Contains(string(captured), `"labelIds":[]`) {
+				t.Errorf("expected labelIds:[] in body, got: %s", captured)
+			}
+			if strings.Contains(string(captured), `"labelIds":null`) {
+				t.Errorf("labelIds must not marshal as null: %s", captured)
+			}
+		})
+	}
+}
+
+// resetIdeaUpdateFlags clears ideaUpdateCmd's package-level flag variables
+// and the pflag "changed" bits so consecutive Execute calls on the shared
+// rootCmd don't leak state between tests.
+func resetIdeaUpdateFlags(t *testing.T) {
+	t.Helper()
+	ideaID = ""
+	ideaUpdateTitle = ""
+	ideaUpdateLabelIDs = ""
+	ideaUpdateCampaignID = ""
+	ideaUpdateBodyJSON = ""
+	ideaUpdateBodyFile = ""
+	ideaUpdateCmd.Flags().VisitAll(func(f *pflag.Flag) {
+		f.Changed = false
+	})
 }
