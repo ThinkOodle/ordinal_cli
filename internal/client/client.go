@@ -22,10 +22,11 @@ const (
 
 	// maxRetries is the maximum number of retries for rate-limited requests.
 	maxRetries = 5
-
-	// initialBackoff is the initial backoff duration for rate-limited retries.
-	initialBackoff = 2 * time.Second
 )
+
+// initialBackoffValue is the starting backoff duration for retries. It is a
+// var so tests can shrink it to make retry timing deterministic.
+var initialBackoffValue = 2 * time.Second
 
 // Client is an HTTP client for the Ordinal API.
 type Client struct {
@@ -160,7 +161,28 @@ func (c *Client) doJSON(method, path string, body interface{}) ([]byte, error) {
 	return c.do(req)
 }
 
-// do executes the request with authentication and retry logic for rate limits.
+// isIdempotent reports whether a request method is safe to retry automatically
+// after a transport-level failure. Non-idempotent methods (POST/PATCH) are not
+// retried on transport errors because the server may have processed the first
+// request before the response was lost, and a retry would duplicate the side
+// effect.
+func isIdempotent(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodPut, http.MethodDelete, http.MethodOptions:
+		return true
+	}
+	return false
+}
+
+// do executes the request with authentication and retry logic. Retries are
+// restricted to:
+//   - 429 Too Many Requests responses (always safe; the request was rejected
+//     before it could take effect).
+//   - Transport errors on idempotent methods.
+//
+// Non-idempotent methods (POST, PATCH) are NOT retried on transport errors:
+// the server may have already processed the request, and retrying would
+// duplicate side effects like creating or modifying resources.
 func (c *Client) do(req *http.Request) ([]byte, error) {
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Accept", "application/json")
@@ -169,8 +191,9 @@ func (c *Client) do(req *http.Request) ([]byte, error) {
 		fmt.Printf(">> %s %s\n", req.Method, req.URL.String())
 	}
 
+	idempotent := isIdempotent(req.Method)
 	var lastErr error
-	backoff := initialBackoff
+	backoff := initialBackoffValue
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
@@ -191,6 +214,9 @@ func (c *Client) do(req *http.Request) ([]byte, error) {
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
+			if !idempotent {
+				return nil, fmt.Errorf("executing request: %w", err)
+			}
 			lastErr = fmt.Errorf("executing request: %w", err)
 			continue
 		}
@@ -198,6 +224,9 @@ func (c *Client) do(req *http.Request) ([]byte, error) {
 		data, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
+			if !idempotent {
+				return nil, fmt.Errorf("reading response body: %w", err)
+			}
 			lastErr = fmt.Errorf("reading response body: %w", err)
 			continue
 		}

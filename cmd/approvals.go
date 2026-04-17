@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -34,8 +35,8 @@ func init() {
 	approvalCreateCmd.Flags().StringVar(&approvalCreateMessage, "message", "", "Optional message for each approval request")
 	approvalCreateCmd.Flags().StringVar(&approvalCreateDueDate, "due-date", "", "Optional due date (ISO 8601)")
 	approvalCreateCmd.Flags().BoolVar(&approvalCreateBlocking, "blocking", false, "Mark these approvals as blocking")
-	approvalCreateCmd.Flags().StringVar(&approvalCreateBodyJSON, "body-json", "", "Full JSON approvals array (overrides --user-ids)")
-	approvalCreateCmd.Flags().StringVar(&approvalCreateBodyFile, "body-file", "", "Path to JSON file (or - for stdin) with approvals array")
+	approvalCreateCmd.Flags().StringVar(&approvalCreateBodyJSON, "body-json", "", "JSON approvals: either a top-level array or an object with an \"approvals\" array (overrides --user-ids)")
+	approvalCreateCmd.Flags().StringVar(&approvalCreateBodyFile, "body-file", "", "Path to JSON file (or - for stdin) with approvals: array or {\"approvals\":[...]}")
 	approvalCreateCmd.MarkFlagRequired("post-id")
 
 	approvalDeleteCmd.Flags().StringVar(&approvalID, "id", "", "Approval ID (UUID)")
@@ -75,19 +76,13 @@ var approvalCreateCmd = &cobra.Command{
 
 		req := models.CreateApprovalsRequest{PostID: approvalPostID}
 
-		body, err := parseBodyJSON(approvalCreateBodyJSON, approvalCreateBodyFile)
+		raw, err := readBodyJSONRaw(approvalCreateBodyJSON, approvalCreateBodyFile)
 		if err != nil {
 			return err
 		}
-		if body != nil {
-			if v, ok := body["approvals"]; ok {
-				raw, err := json.Marshal(v)
-				if err != nil {
-					return fmt.Errorf("encoding approvals body: %w", err)
-				}
-				if err := json.Unmarshal(raw, &req.Approvals); err != nil {
-					return fmt.Errorf("parsing approvals body: %w", err)
-				}
+		if raw != nil {
+			if err := parseApprovalsBody(raw, &req.Approvals); err != nil {
+				return err
 			}
 		} else if approvalCreateUserIDs != "" {
 			for _, uid := range splitCSV(approvalCreateUserIDs) {
@@ -110,6 +105,39 @@ var approvalCreateCmd = &cobra.Command{
 		}
 		return printRawJSON(data)
 	},
+}
+
+// parseApprovalsBody decodes a --body-json/--body-file payload into approvals.
+// Accepts either a bare JSON array of approval entries or an object with an
+// "approvals" key whose value is the array, as documented in --help.
+func parseApprovalsBody(raw []byte, out *[]models.ApprovalRequestInput) error {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 {
+		return nil
+	}
+
+	switch trimmed[0] {
+	case '[':
+		if err := json.Unmarshal(trimmed, out); err != nil {
+			return fmt.Errorf("parsing approvals array: %w", err)
+		}
+		return nil
+	case '{':
+		var obj struct {
+			Approvals json.RawMessage `json:"approvals"`
+		}
+		if err := json.Unmarshal(trimmed, &obj); err != nil {
+			return fmt.Errorf("parsing approvals body: %w", err)
+		}
+		if len(obj.Approvals) == 0 {
+			return fmt.Errorf(`approvals body object must contain an "approvals" array`)
+		}
+		if err := json.Unmarshal(obj.Approvals, out); err != nil {
+			return fmt.Errorf("parsing approvals body: %w", err)
+		}
+		return nil
+	}
+	return fmt.Errorf("approvals body must be a JSON array or an object with an \"approvals\" array")
 }
 
 var approvalDeleteCmd = &cobra.Command{

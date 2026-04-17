@@ -132,6 +132,12 @@ func formatCSV(data interface{}) (string, error) {
 
 // extractRows converts data into string rows and headers for table/CSV output.
 // Supports slices of maps, slices of structs, single maps, and single structs.
+//
+// For list-style wrapper responses with exactly one array-valued field
+// alongside scalar pagination siblings (e.g. {"posts":[...], "nextCursor":"...",
+// "hasMore":true}), the array is unwrapped and its elements become the rows.
+// This keeps table/csv output useful for the many list endpoints that return
+// an envelope rather than a bare array.
 func extractRows(data interface{}) ([][]string, []string, error) {
 	b, err := json.Marshal(data)
 	if err != nil {
@@ -148,10 +154,54 @@ func extractRows(data interface{}) ([][]string, []string, error) {
 
 	var item map[string]interface{}
 	if err := json.Unmarshal(b, &item); err == nil && len(item) > 0 {
+		if unwrapped, ok := unwrapListEnvelope(item); ok {
+			if len(unwrapped) == 0 {
+				return nil, nil, nil
+			}
+			return mapSliceToRows(unwrapped)
+		}
 		return mapSliceToRows([]map[string]interface{}{item})
 	}
 
 	return nil, nil, fmt.Errorf("unsupported data type for table/csv output: %s", reflect.TypeOf(data))
+}
+
+// unwrapListEnvelope detects a list-response envelope — a JSON object with
+// exactly one field whose value is an array of objects, alongside only scalar
+// siblings (typical pagination metadata like nextCursor, hasMore, total). When
+// matched, returns the array contents so table/csv output can render the items
+// as rows instead of turning the envelope itself into a single row.
+func unwrapListEnvelope(item map[string]interface{}) ([]map[string]interface{}, bool) {
+	var (
+		arrayKey   string
+		arrayValue []interface{}
+		arrayCount int
+	)
+	for k, v := range item {
+		switch vv := v.(type) {
+		case []interface{}:
+			arrayKey = k
+			arrayValue = vv
+			arrayCount++
+		case map[string]interface{}:
+			// Nested objects aren't pagination metadata; don't treat this
+			// as a list envelope.
+			return nil, false
+		}
+	}
+	if arrayCount != 1 || arrayKey == "" {
+		return nil, false
+	}
+
+	items := make([]map[string]interface{}, 0, len(arrayValue))
+	for _, entry := range arrayValue {
+		m, ok := entry.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+		items = append(items, m)
+	}
+	return items, true
 }
 
 // mapSliceToRows converts a slice of maps to rows with sorted headers.
