@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"time"
 )
@@ -188,7 +189,7 @@ func (c *Client) do(req *http.Request) ([]byte, error) {
 	req.Header.Set("Accept", "application/json")
 
 	if c.verbose {
-		fmt.Printf(">> %s %s\n", req.Method, req.URL.String())
+		fmt.Fprintf(os.Stderr, ">> %s %s\n", req.Method, req.URL.String())
 	}
 
 	idempotent := isIdempotent(req.Method)
@@ -198,7 +199,7 @@ func (c *Client) do(req *http.Request) ([]byte, error) {
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
 			if c.verbose {
-				fmt.Printf(">> retry %d/%d after %s\n", attempt, maxRetries, backoff)
+				fmt.Fprintf(os.Stderr, ">> retry %d/%d after %s\n", attempt, maxRetries, backoff)
 			}
 			time.Sleep(backoff)
 			backoff *= 2
@@ -232,9 +233,9 @@ func (c *Client) do(req *http.Request) ([]byte, error) {
 		}
 
 		if c.verbose {
-			fmt.Printf("<< %d %s\n", resp.StatusCode, http.StatusText(resp.StatusCode))
+			fmt.Fprintf(os.Stderr, "<< %d %s\n", resp.StatusCode, http.StatusText(resp.StatusCode))
 			if len(data) > 0 {
-				fmt.Printf("<< %s\n", string(data))
+				fmt.Fprintf(os.Stderr, "<< %s\n", string(data))
 			}
 		}
 

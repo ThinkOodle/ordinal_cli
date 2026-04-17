@@ -29,15 +29,11 @@ var rootCmd = &cobra.Command{
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
-			// `ordinal auth` writes a fresh config, so don't let a broken
-			// config file on disk block the one command that can repair it.
-			// Fall back to defaults and let the command proceed.
-			if commandBypassesConfig(cmd) {
-				cfg = &config.Config{OutputFormat: config.DefaultOutputFormat}
-				fmt.Fprintf(os.Stderr, "warning: existing config could not be loaded (%v); continuing with defaults\n", err)
-			} else {
-				return err
-			}
+			// A broken config file must not block higher-priority sources
+			// (flags, env vars) or the `auth` command that can repair it.
+			// Fall back to defaults, warn, and let the command proceed.
+			cfg = &config.Config{OutputFormat: config.DefaultOutputFormat}
+			fmt.Fprintf(os.Stderr, "warning: existing config could not be loaded (%v); continuing with defaults\n", err)
 		}
 		appConfig = cfg
 
@@ -60,19 +56,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgOutputFormat, "output", "o", "", "Output format: json, table, csv (default: json)")
 	rootCmd.PersistentFlags().BoolVar(&cfgNoColor, "no-color", false, "Disable colored output")
 	rootCmd.PersistentFlags().BoolVarP(&cfgVerbose, "verbose", "v", false, "Verbose output (shows request/response details)")
-}
-
-// commandBypassesConfig reports whether a command should be allowed to run
-// even when the on-disk config fails to load. Recovery-oriented commands like
-// `auth` must keep working so users can repair a broken config via the CLI
-// itself instead of hand-editing the file.
-func commandBypassesConfig(cmd *cobra.Command) bool {
-	for c := cmd; c != nil; c = c.Parent() {
-		if c == authCmd {
-			return true
-		}
-	}
-	return false
 }
 
 // Execute runs the root command.
