@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
 	"github.com/spf13/cobra"
@@ -80,7 +78,6 @@ var commentDeleteCmd = &cobra.Command{
 		if err := api.NewCommentService(c).Delete(commentID); err != nil {
 			return err
 		}
-		fmt.Printf("Comment %s deleted\n", commentID)
-		return nil
+		return printResult(deletedAck("comment", commentID))
 	},
 }

@@ -89,6 +89,14 @@ var webhookCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a webhook",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Cobra's MarkFlagRequired only checks that --topics was passed,
+		// not that it contains any non-empty entry after trimming. A value
+		// like "," or "  ,  " collapses to an empty slice in splitCSV and
+		// would otherwise send an empty topics array to the API.
+		topics := splitCSV(webhookCreateTopics)
+		if len(topics) == 0 {
+			return fmt.Errorf("--topics must contain at least one non-empty event topic")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -97,7 +105,7 @@ var webhookCreateCmd = &cobra.Command{
 			Name:        webhookCreateName,
 			URL:         webhookCreateURL,
 			Description: webhookCreateDescription,
-			Topics:      splitCSV(webhookCreateTopics),
+			Topics:      topics,
 		}
 		if webhookCreateHeadersJSON != "" {
 			headers, err := parseBodyJSON(webhookCreateHeadersJSON, "")
@@ -157,7 +165,6 @@ var webhookDeleteCmd = &cobra.Command{
 		if err := api.NewWebhookService(c).Delete(webhookID); err != nil {
 			return err
 		}
-		fmt.Printf("Webhook %s deleted\n", webhookID)
-		return nil
+		return printResult(deletedAck("webhook", webhookID))
 	},
 }

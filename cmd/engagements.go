@@ -141,7 +141,6 @@ var engagementDeleteCmd = &cobra.Command{
 		if err := api.NewEngagementService(c).Delete(engagementID); err != nil {
 			return err
 		}
-		fmt.Printf("Engagement %s deleted\n", engagementID)
-		return nil
+		return printResult(deletedAck("engagement", engagementID))
 	},
 }

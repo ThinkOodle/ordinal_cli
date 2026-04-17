@@ -119,6 +119,12 @@ var postListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List posts",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Help text advertises 1-100; enforce locally so the flag's
+		// contract, runtime behavior, and API constraints agree without
+		// making a round-trip for an obviously-invalid value.
+		if postListLimit < 0 || postListLimit > 100 {
+			return fmt.Errorf("--limit must be between 1 and 100")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err

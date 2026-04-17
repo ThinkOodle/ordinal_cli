@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
 	"github.com/spf13/cobra"
@@ -81,7 +79,6 @@ var labelDeleteCmd = &cobra.Command{
 		if err := api.NewLabelService(c).Delete(labelID); err != nil {
 			return err
 		}
-		fmt.Printf("Label %s deleted\n", labelID)
-		return nil
+		return printResult(deletedAck("label", labelID))
 	},
 }

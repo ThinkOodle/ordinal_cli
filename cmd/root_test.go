@@ -2,12 +2,15 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/csv"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/ordinal-cli/ordinal/internal/config"
+	"github.com/ordinal-cli/ordinal/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -171,4 +174,63 @@ func TestBodyJSONFlagPrecedence_CreatePattern(t *testing.T) {
 	if merged["extra"] != "keep" {
 		t.Errorf("non-matching body key must survive: got %v", merged["extra"])
 	}
+}
+
+// TestDeletedAck_FormatsParseable guards against regressing delete
+// subcommands to raw fmt.Printf. All three formats must remain machine-
+// readable: JSON must decode, CSV must have a header+row, and table must
+// show the two scalar fields. Every delete command routes through
+// deletedAck + printResult, so this one test covers the whole set.
+func TestDeletedAck_FormatsParseable(t *testing.T) {
+	ack := deletedAck("comment", "c-123")
+
+	t.Run("json", func(t *testing.T) {
+		out, _, err := output.FormatOutput(ack, output.FormatJSON)
+		if err != nil {
+			t.Fatalf("json: %v", err)
+		}
+		var decoded map[string]interface{}
+		if err := json.Unmarshal([]byte(out), &decoded); err != nil {
+			t.Fatalf("json output not parseable: %v\n%s", err, out)
+		}
+		if decoded["deleted"] != true || decoded["id"] != "c-123" || decoded["resource"] != "comment" {
+			t.Errorf("unexpected decoded json: %+v", decoded)
+		}
+	})
+
+	t.Run("csv", func(t *testing.T) {
+		out, _, err := output.FormatOutput(ack, output.FormatCSV)
+		if err != nil {
+			t.Fatalf("csv: %v", err)
+		}
+		records, err := csv.NewReader(strings.NewReader(out)).ReadAll()
+		if err != nil {
+			t.Fatalf("csv output not parseable: %v\n%s", err, out)
+		}
+		if len(records) != 2 {
+			t.Fatalf("expected header + 1 row, got %d rows: %v", len(records), records)
+		}
+		// Headers are alphabetically sorted by mapSliceToRows.
+		wantHeader := []string{"deleted", "id", "resource"}
+		for i, h := range wantHeader {
+			if records[0][i] != h {
+				t.Errorf("header[%d] = %q, want %q", i, records[0][i], h)
+			}
+		}
+		if records[1][0] != "true" || records[1][1] != "c-123" || records[1][2] != "comment" {
+			t.Errorf("unexpected csv row: %v", records[1])
+		}
+	})
+
+	t.Run("table", func(t *testing.T) {
+		out, _, err := output.FormatOutput(ack, output.FormatTable)
+		if err != nil {
+			t.Fatalf("table: %v", err)
+		}
+		for _, want := range []string{"DELETED", "ID", "RESOURCE", "c-123", "comment", "true"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("table output missing %q:\n%s", want, out)
+			}
+		}
+	})
 }

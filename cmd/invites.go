@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
 	"github.com/spf13/cobra"
@@ -74,7 +72,6 @@ var inviteDeleteCmd = &cobra.Command{
 		if err := api.NewInviteService(c).Delete(inviteID); err != nil {
 			return err
 		}
-		fmt.Printf("Invite %s deleted\n", inviteID)
-		return nil
+		return printResult(deletedAck("invite", inviteID))
 	},
 }

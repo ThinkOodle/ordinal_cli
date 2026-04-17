@@ -148,8 +148,7 @@ var slackBoostDeleteCmd = &cobra.Command{
 		if err := api.NewSlackBoostService(c).Delete(slackBoostID); err != nil {
 			return err
 		}
-		fmt.Printf("Slack boost %s deleted\n", slackBoostID)
-		return nil
+		return printResult(deletedAck("slack-boost", slackBoostID))
 	},
 }
 

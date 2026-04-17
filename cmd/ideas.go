@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
@@ -95,6 +96,12 @@ var ideaListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List ideas",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Help text advertises 1-100; enforce locally so the flag's
+		// contract, runtime behavior, and API constraints agree without
+		// making a round-trip for an obviously-invalid value.
+		if ideaListLimit < 0 || ideaListLimit > 100 {
+			return fmt.Errorf("--limit must be between 1 and 100")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -148,10 +155,6 @@ var ideaCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create an idea",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := newClient()
-		if err != nil {
-			return err
-		}
 		body, err := parseBodyJSON(ideaCreateBodyJSON, ideaCreateBodyFile)
 		if err != nil {
 			return err
@@ -168,8 +171,16 @@ var ideaCreateCmd = &cobra.Command{
 		if ideaCreateCampaignID != "" {
 			body["campaignId"] = ideaCreateCampaignID
 		}
-		if _, ok := body["title"]; !ok {
-			return fmt.Errorf("--title or a title field in --body-json/--body-file is required")
+		// Validate before newClient() so a missing/blank title surfaces
+		// ahead of an unrelated auth error, and so {"title":null} or
+		// {"title":"   "} fail locally instead of wasting an API call.
+		title, ok := body["title"].(string)
+		if !ok || strings.TrimSpace(title) == "" {
+			return fmt.Errorf("--title or a non-empty title field in --body-json/--body-file is required")
+		}
+		c, err := newClient()
+		if err != nil {
+			return err
 		}
 		data, err := api.NewIdeaService(c).Create(body)
 		if err != nil {
