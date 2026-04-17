@@ -49,6 +49,39 @@ func TestSaveAPIKey_Roundtrip(t *testing.T) {
 	}
 }
 
+func TestLoad_BrokenConfigPreservesEnvAPIKey(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("ORDINAL_API_KEY", "env-key")
+	t.Setenv("ORDINAL_OUTPUT_FORMAT", "")
+	t.Setenv("ORDINAL_NO_COLOR", "")
+	t.Setenv("ORDINAL_VERBOSE", "")
+
+	dir := filepath.Join(home, ".config", configDirName)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	path := filepath.Join(dir, configFileName+"."+configFileType)
+	// Deliberately malformed YAML so Viper's parser fails.
+	if err := os.WriteFile(path, []byte("api_key: [not: valid"), 0600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	cfg, err := Load()
+	if err == nil {
+		t.Fatalf("expected a read error for malformed config")
+	}
+	if cfg == nil {
+		t.Fatalf("expected a non-nil config even on broken file")
+	}
+	if cfg.APIKey != "env-key" {
+		t.Errorf("expected env ORDINAL_API_KEY to survive broken config, got %q", cfg.APIKey)
+	}
+	if cfg.OutputFormat != DefaultOutputFormat {
+		t.Errorf("expected default output format to survive, got %q", cfg.OutputFormat)
+	}
+}
+
 func TestGetAPIKey_Priority(t *testing.T) {
 	cfg := &Config{APIKey: "from-config"}
 	if got, err := GetAPIKey("flag-key", cfg); err != nil || got != "flag-key" {

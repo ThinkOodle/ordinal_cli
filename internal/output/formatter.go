@@ -25,6 +25,18 @@ const (
 	FormatCSV Format = "csv"
 )
 
+// IsValidFormat reports whether f is one of the supported output formats.
+// Callers should validate user-supplied format strings at input time so a
+// typo in --output, ORDINAL_OUTPUT_FORMAT, or the config file fails fast
+// instead of silently degrading to a default.
+func IsValidFormat(f Format) bool {
+	switch f {
+	case FormatJSON, FormatTable, FormatCSV:
+		return true
+	}
+	return false
+}
+
 // FormatOutput formats data according to the given format. Returns the main
 // content plus an optional footer string. When a list-envelope response is
 // unwrapped for table/csv rendering, the footer carries the pagination
@@ -41,8 +53,7 @@ func FormatOutput(data interface{}, format Format) (string, string, error) {
 		out, err := formatJSON(data)
 		return out, "", err
 	default:
-		out, err := formatJSON(data)
-		return out, "", err
+		return "", "", fmt.Errorf("invalid output format %q: must be one of json, table, csv", format)
 	}
 }
 

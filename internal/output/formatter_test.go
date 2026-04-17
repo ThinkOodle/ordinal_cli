@@ -5,6 +5,29 @@ import (
 	"testing"
 )
 
+func TestFormatOutput_UnknownFormatErrors(t *testing.T) {
+	_, _, err := FormatOutput(map[string]int{"a": 1}, Format("yaml"))
+	if err == nil {
+		t.Fatalf("expected error for unknown format")
+	}
+	if !strings.Contains(err.Error(), "invalid output format") {
+		t.Errorf("expected invalid output format message, got %v", err)
+	}
+}
+
+func TestIsValidFormat(t *testing.T) {
+	for _, f := range []Format{FormatJSON, FormatTable, FormatCSV} {
+		if !IsValidFormat(f) {
+			t.Errorf("expected %q to be valid", f)
+		}
+	}
+	for _, f := range []Format{"", "yaml", "JSON", "jsonl"} {
+		if IsValidFormat(f) {
+			t.Errorf("expected %q to be invalid", f)
+		}
+	}
+}
+
 func TestFormatOutput_JSON(t *testing.T) {
 	out, footer, err := FormatOutput(map[string]int{"a": 1}, FormatJSON)
 	if err != nil {

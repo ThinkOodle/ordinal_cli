@@ -31,20 +31,30 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			// A broken config file must not block higher-priority sources
 			// (flags, env vars) or the `auth` command that can repair it.
-			// Fall back to defaults, warn, and let the command proceed.
-			cfg = &config.Config{OutputFormat: config.DefaultOutputFormat}
-			fmt.Fprintf(os.Stderr, "warning: existing config could not be loaded (%v); continuing with defaults\n", err)
+			// Load still returns env-derived values alongside the error, so
+			// we warn but keep the partial config rather than dropping it.
+			fmt.Fprintf(os.Stderr, "warning: existing config could not be loaded (%v); continuing with env and defaults\n", err)
+		}
+		if cfg == nil {
+			cfg = &config.Config{}
 		}
 		appConfig = cfg
 
-		if cfgOutputFormat != "" {
+		if cmd.Flags().Changed("output") {
 			appConfig.OutputFormat = cfgOutputFormat
 		}
-		if cfgNoColor {
-			appConfig.NoColor = true
+		if cmd.Flags().Changed("no-color") {
+			appConfig.NoColor = cfgNoColor
 		}
-		if cfgVerbose {
-			appConfig.Verbose = true
+		if cmd.Flags().Changed("verbose") {
+			appConfig.Verbose = cfgVerbose
+		}
+
+		if appConfig.OutputFormat == "" {
+			appConfig.OutputFormat = config.DefaultOutputFormat
+		}
+		if !output.IsValidFormat(output.Format(appConfig.OutputFormat)) {
+			return fmt.Errorf("invalid output format %q: must be one of json, table, csv", appConfig.OutputFormat)
 		}
 
 		return nil

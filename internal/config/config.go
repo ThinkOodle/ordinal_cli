@@ -56,6 +56,11 @@ func ConfigFilePath() (string, error) {
 
 // Load reads configuration from the config file and environment variables.
 // CLI flags should override these values after Load is called.
+//
+// A malformed or unreadable config file is non-fatal: Load still returns a
+// *Config populated from env vars and defaults, along with the read error so
+// the caller can surface a warning. This preserves ORDINAL_* env values
+// (most importantly ORDINAL_API_KEY) when the on-disk file is broken.
 func Load() (*Config, error) {
 	v := viper.New()
 
@@ -71,6 +76,7 @@ func Load() (*Config, error) {
 	v.BindEnv("no_color", "ORDINAL_NO_COLOR")
 	v.BindEnv("verbose", "ORDINAL_VERBOSE")
 
+	var readErr error
 	configDir, err := ConfigDir()
 	if err == nil {
 		v.AddConfigPath(configDir)
@@ -81,7 +87,7 @@ func Load() (*Config, error) {
 			if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 				configFile := filepath.Join(configDir, configFileName+"."+configFileType)
 				if _, statErr := os.Stat(configFile); statErr == nil {
-					return nil, fmt.Errorf("reading config file: %w", err)
+					readErr = fmt.Errorf("reading config file: %w", err)
 				}
 			}
 		}
@@ -92,7 +98,7 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
 
-	return cfg, nil
+	return cfg, readErr
 }
 
 // SaveAPIKey writes the API key to the config file, preserving any other

@@ -43,7 +43,7 @@ func init() {
 
 	slackBoostUpdateCmd.Flags().StringVar(&slackBoostID, "id", "", "Slack boost ID (UUID)")
 	slackBoostUpdateCmd.Flags().StringVar(&slackBoostUpdateCopy, "copy", "", "Updated custom message")
-	slackBoostUpdateCmd.Flags().StringVar(&slackBoostUpdateBodyJSON, "body-json", "", "Full JSON body (overrides individual flags)")
+	slackBoostUpdateCmd.Flags().StringVar(&slackBoostUpdateBodyJSON, "body-json", "", "Full JSON body (individual flags override matching keys when set)")
 	slackBoostUpdateCmd.Flags().StringVar(&slackBoostUpdateBodyFile, "body-file", "", "Path to JSON body file (or - for stdin)")
 	slackBoostUpdateCmd.MarkFlagRequired("id")
 

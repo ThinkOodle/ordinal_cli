@@ -64,14 +64,14 @@ func init() {
 	ideaCreateCmd.Flags().StringVar(&ideaCreateTitle, "title", "", "Idea title")
 	ideaCreateCmd.Flags().StringVar(&ideaCreateLabelIDs, "label-ids", "", "Comma-separated label IDs")
 	ideaCreateCmd.Flags().StringVar(&ideaCreateCampaignID, "campaign-id", "", "Campaign ID")
-	ideaCreateCmd.Flags().StringVar(&ideaCreateBodyJSON, "body-json", "", "Full JSON body including channel configs")
+	ideaCreateCmd.Flags().StringVar(&ideaCreateBodyJSON, "body-json", "", "Full JSON body including channel configs (individual flags override matching keys)")
 	ideaCreateCmd.Flags().StringVar(&ideaCreateBodyFile, "body-file", "", "Path to JSON body file (or - for stdin)")
 
 	ideaUpdateCmd.Flags().StringVar(&ideaID, "id", "", "Idea ID (UUID)")
 	ideaUpdateCmd.Flags().StringVar(&ideaUpdateTitle, "title", "", "Idea title")
 	ideaUpdateCmd.Flags().StringVar(&ideaUpdateLabelIDs, "label-ids", "", "Comma-separated label IDs")
 	ideaUpdateCmd.Flags().StringVar(&ideaUpdateCampaignID, "campaign-id", "", "Campaign ID")
-	ideaUpdateCmd.Flags().StringVar(&ideaUpdateBodyJSON, "body-json", "", "Full JSON body (overrides individual flags)")
+	ideaUpdateCmd.Flags().StringVar(&ideaUpdateBodyJSON, "body-json", "", "Full JSON body (individual flags override matching keys when set)")
 	ideaUpdateCmd.Flags().StringVar(&ideaUpdateBodyFile, "body-file", "", "Path to JSON body file (or - for stdin)")
 	ideaUpdateCmd.MarkFlagRequired("id")
 

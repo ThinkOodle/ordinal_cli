@@ -82,7 +82,7 @@ func init() {
 	postCreateCmd.Flags().StringVar(&postCreateLabelIDs, "label-ids", "", "Comma-separated label IDs")
 	postCreateCmd.Flags().StringVar(&postCreateCampaignID, "campaign-id", "", "Campaign ID")
 	postCreateCmd.Flags().StringVar(&postCreateNotes, "notes", "", "Post notes")
-	postCreateCmd.Flags().StringVar(&postCreateBodyJSON, "body-json", "", "Full JSON body (overrides individual flags; use for nested channel configs)")
+	postCreateCmd.Flags().StringVar(&postCreateBodyJSON, "body-json", "", "Full JSON body (individual flags override matching keys; use for nested channel configs)")
 	postCreateCmd.Flags().StringVar(&postCreateBodyFile, "body-file", "", "Path to JSON body file (or - for stdin)")
 
 	postUpdateCmd.Flags().StringVar(&postID, "id", "", "Post ID (UUID)")
@@ -92,7 +92,7 @@ func init() {
 	postUpdateCmd.Flags().StringVar(&postUpdateLabelIDs, "label-ids", "", "Comma-separated label IDs")
 	postUpdateCmd.Flags().StringVar(&postUpdateCampaignID, "campaign-id", "", "Campaign ID")
 	postUpdateCmd.Flags().StringVar(&postUpdateNotes, "notes", "", "Post notes")
-	postUpdateCmd.Flags().StringVar(&postUpdateBodyJSON, "body-json", "", "Full JSON body (overrides individual flags)")
+	postUpdateCmd.Flags().StringVar(&postUpdateBodyJSON, "body-json", "", "Full JSON body (individual flags override matching keys when set)")
 	postUpdateCmd.Flags().StringVar(&postUpdateBodyFile, "body-file", "", "Path to JSON body file (or - for stdin)")
 	postUpdateCmd.MarkFlagRequired("id")
 
@@ -175,7 +175,7 @@ var postGetCmd = &cobra.Command{
 var postCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a post",
-	Long:  "Create a post. Use --body-json or --body-file to pass the full request including nested linkedIn/x/instagram channel configs. Individual flags merge into the body when provided.",
+	Long:  "Create a post. Use --body-json or --body-file to pass the full request including nested linkedIn/x/instagram channel configs. Individual flags override matching top-level keys in the body when provided.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := newClient()
 		if err != nil {
