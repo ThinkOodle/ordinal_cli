@@ -127,6 +127,11 @@ func Execute() {
 	}
 }
 
+// testClientOpts is appended to the options list in newClient so tests can
+// install a mock base URL and transport without a production env-var hook.
+// It is always empty in normal builds.
+var testClientOpts []client.Option
+
 // newClient creates an authenticated API client from the current configuration.
 func newClient() (*client.Client, error) {
 	apiKey, err := config.GetAPIKey(cfgAPIKey, appConfig)
@@ -138,6 +143,7 @@ func newClient() (*client.Client, error) {
 	if appConfig != nil && appConfig.Verbose {
 		opts = append(opts, client.WithVerbose(true))
 	}
+	opts = append(opts, testClientOpts...)
 
 	return client.New(apiKey, opts...), nil
 }
@@ -200,6 +206,16 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
+}
+
+// normalizeCSV normalizes a comma-separated flag value for forwarding into a
+// query string: each entry is trimmed, empty entries are dropped, and the
+// survivors are rejoined without surrounding spaces. Commands that feed a
+// raw --foo "a, b, c" through into an API query param would otherwise send
+// "a, b, c" verbatim, and the server rarely trims on its side. Returns "" if
+// no non-empty entries remain so the API layer continues to omit the param.
+func normalizeCSV(s string) string {
+	return strings.Join(splitCSV(s), ",")
 }
 
 // parseBodyJSON reads a JSON body from either an inline string or a file path.

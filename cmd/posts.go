@@ -126,8 +126,14 @@ var postListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Help text advertises 1-100; enforce locally so the flag's
 		// contract, runtime behavior, and API constraints agree without
-		// making a round-trip for an obviously-invalid value.
-		if postListLimit < 0 || postListLimit > 100 {
+		// making a round-trip for an obviously-invalid value. Treat an
+		// explicit --limit=0 as invalid too: the API layer only emits limit
+		// when >0, so a silently-dropped 0 would return server defaults
+		// instead of the obvious "must be 1-100" error the help promises.
+		if cmd.Flags().Changed("limit") && postListLimit <= 0 {
+			return fmt.Errorf("--limit must be between 1 and 100")
+		}
+		if postListLimit > 100 {
 			return fmt.Errorf("--limit must be between 1 and 100")
 		}
 		c, err := newClient()
@@ -137,13 +143,13 @@ var postListCmd = &cobra.Command{
 		params := models.ListPostsParams{
 			Limit:              postListLimit,
 			Cursor:             postListCursor,
-			IDs:                postListIDs,
+			IDs:                normalizeCSV(postListIDs),
 			Status:             postListStatus,
 			Channel:            postListChannel,
 			LinkedInProfileID:  postListLinkedInProfileID,
 			XProfileID:         postListXProfileID,
 			InstagramProfileID: postListInstagramProfileID,
-			LabelIDs:           postListLabelIDs,
+			LabelIDs:           normalizeCSV(postListLabelIDs),
 			PublishDateMin:     postListPublishDateMin,
 			PublishDateMax:     postListPublishDateMax,
 			CreatedAtMin:       postListCreatedAtMin,

@@ -16,7 +16,7 @@ func TestLinkedInLeadsListPosts_RejectsLimitOutOfRange(t *testing.T) {
 	t.Setenv("ORDINAL_OUTPUT_FORMAT", "")
 	t.Setenv("ORDINAL_VERBOSE", "")
 
-	for _, limit := range []string{"101", "500", "-1"} {
+	for _, limit := range []string{"101", "500", "-1", "0"} {
 		t.Run("limit="+limit, func(t *testing.T) {
 			llLimit = 0
 
@@ -44,7 +44,7 @@ func TestLinkedInLeadsGetLeads_RejectsLimitOutOfRange(t *testing.T) {
 	t.Setenv("ORDINAL_OUTPUT_FORMAT", "")
 	t.Setenv("ORDINAL_VERBOSE", "")
 
-	for _, limit := range []string{"251", "1000", "-1"} {
+	for _, limit := range []string{"251", "1000", "-1", "0"} {
 		t.Run("limit="+limit, func(t *testing.T) {
 			llLimit = 0
 

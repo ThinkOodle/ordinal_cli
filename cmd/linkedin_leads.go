@@ -52,7 +52,13 @@ var linkedInLeadsListPostsCmd = &cobra.Command{
 		// Enforce the advertised 1-100 range locally so out-of-range values
 		// fail with a clear error instead of being silently dropped from the
 		// query (which would return server defaults and confuse callers).
-		if llLimit < 0 || llLimit > 100 {
+		// An explicit --limit=0 is treated as out-of-range for the same
+		// reason: the API layer omits limit when <=0, so 0 would silently
+		// become the server default rather than the documented error.
+		if cmd.Flags().Changed("limit") && llLimit <= 0 {
+			return fmt.Errorf("--limit must be between 1 and 100")
+		}
+		if llLimit > 100 {
 			return fmt.Errorf("--limit must be between 1 and 100")
 		}
 		c, err := newClient()
@@ -76,7 +82,13 @@ var linkedInLeadsGetLeadsCmd = &cobra.Command{
 	Use:   "get-leads",
 	Short: "Get leads (engagers) for a LinkedIn post",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if llLimit < 0 || llLimit > 250 {
+		// Explicit --limit=0 is rejected for the same reason as list-posts:
+		// the API layer omits limit when <=0, so 0 would silently become the
+		// server default rather than the documented 1-250 error.
+		if cmd.Flags().Changed("limit") && llLimit <= 0 {
+			return fmt.Errorf("--limit must be between 1 and 250")
+		}
+		if llLimit > 250 {
 			return fmt.Errorf("--limit must be between 1 and 250")
 		}
 		if llMinFollowerCount < 0 {
@@ -87,7 +99,7 @@ var linkedInLeadsGetLeadsCmd = &cobra.Command{
 			return err
 		}
 		data, err := api.NewLinkedInLeadsService(c).GetLeadsByPost(llProfileID, llPostID, api.LinkedInLeadsGetLeadsParams{
-			Types:            llTypes,
+			Types:            normalizeCSV(llTypes),
 			MinFollowerCount: llMinFollowerCount,
 			Limit:            llLimit,
 			Cursor:           llCursor,

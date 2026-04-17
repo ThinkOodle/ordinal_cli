@@ -98,8 +98,14 @@ var ideaListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Help text advertises 1-100; enforce locally so the flag's
 		// contract, runtime behavior, and API constraints agree without
-		// making a round-trip for an obviously-invalid value.
-		if ideaListLimit < 0 || ideaListLimit > 100 {
+		// making a round-trip for an obviously-invalid value. Treat an
+		// explicit --limit=0 as invalid too: the API layer only emits limit
+		// when >0, so a silently-dropped 0 would return server defaults
+		// instead of the obvious "must be 1-100" error the help promises.
+		if cmd.Flags().Changed("limit") && ideaListLimit <= 0 {
+			return fmt.Errorf("--limit must be between 1 and 100")
+		}
+		if ideaListLimit > 100 {
 			return fmt.Errorf("--limit must be between 1 and 100")
 		}
 		c, err := newClient()
@@ -109,11 +115,11 @@ var ideaListCmd = &cobra.Command{
 		params := models.ListIdeasParams{
 			Limit:             ideaListLimit,
 			Cursor:            ideaListCursor,
-			IDs:               ideaListIDs,
+			IDs:               normalizeCSV(ideaListIDs),
 			Channel:           ideaListChannel,
 			LinkedInProfileID: ideaListLinkedInProfileID,
 			XProfileID:        ideaListXProfileID,
-			LabelIDs:          ideaListLabelIDs,
+			LabelIDs:          normalizeCSV(ideaListLabelIDs),
 			CreatedAtMin:      ideaListCreatedAtMin,
 			CreatedAtMax:      ideaListCreatedAtMax,
 			SortBy:            ideaListSortBy,
