@@ -6,9 +6,12 @@ import (
 )
 
 func TestFormatOutput_JSON(t *testing.T) {
-	out, err := FormatOutput(map[string]int{"a": 1}, FormatJSON)
+	out, footer, err := FormatOutput(map[string]int{"a": 1}, FormatJSON)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if footer != "" {
+		t.Errorf("expected no footer for JSON; got %q", footer)
 	}
 	if !strings.Contains(out, `"a": 1`) {
 		t.Errorf("expected pretty JSON, got %q", out)
@@ -20,7 +23,7 @@ func TestFormatOutput_Table(t *testing.T) {
 		{"id": "1", "name": "a"},
 		{"id": "2", "name": "b"},
 	}
-	out, err := FormatOutput(items, FormatTable)
+	out, _, err := FormatOutput(items, FormatTable)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -34,7 +37,7 @@ func TestFormatOutput_Table(t *testing.T) {
 
 func TestFormatOutput_CSV(t *testing.T) {
 	items := []map[string]interface{}{{"id": "1", "name": "a"}}
-	out, err := FormatOutput(items, FormatCSV)
+	out, _, err := FormatOutput(items, FormatCSV)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -48,7 +51,7 @@ func TestFormatOutput_CSV(t *testing.T) {
 }
 
 func TestFormatOutput_EmptyTable(t *testing.T) {
-	out, err := FormatOutput([]map[string]interface{}{}, FormatTable)
+	out, _, err := FormatOutput([]map[string]interface{}{}, FormatTable)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -59,7 +62,9 @@ func TestFormatOutput_EmptyTable(t *testing.T) {
 
 // Wrapper list responses (items + pagination metadata) used to render as a
 // single row with columns like POSTS/NEXTCURSOR/HASMORE. They should unwrap to
-// the contained items so table/csv output is actually useful for list commands.
+// the contained items so table/csv output is actually useful for list
+// commands, and their pagination metadata should surface as a footer so
+// callers can paginate without switching to JSON.
 func TestFormatOutput_UnwrapsListEnvelope_Table(t *testing.T) {
 	envelope := map[string]interface{}{
 		"posts": []map[string]interface{}{
@@ -69,7 +74,7 @@ func TestFormatOutput_UnwrapsListEnvelope_Table(t *testing.T) {
 		"nextCursor": "cur",
 		"hasMore":    true,
 	}
-	out, err := FormatOutput(envelope, FormatTable)
+	out, footer, err := FormatOutput(envelope, FormatTable)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -82,6 +87,12 @@ func TestFormatOutput_UnwrapsListEnvelope_Table(t *testing.T) {
 	if !strings.Contains(out, "a") || !strings.Contains(out, "b") {
 		t.Errorf("expected row values a,b; got %q", out)
 	}
+	if !strings.Contains(footer, "nextCursor: cur") {
+		t.Errorf("expected footer to carry nextCursor; got %q", footer)
+	}
+	if !strings.Contains(footer, "hasMore: true") {
+		t.Errorf("expected footer to carry hasMore; got %q", footer)
+	}
 }
 
 func TestFormatOutput_UnwrapsListEnvelope_CSV(t *testing.T) {
@@ -90,7 +101,7 @@ func TestFormatOutput_UnwrapsListEnvelope_CSV(t *testing.T) {
 			{"id": "1", "name": "x"},
 		},
 	}
-	out, err := FormatOutput(envelope, FormatCSV)
+	out, footer, err := FormatOutput(envelope, FormatCSV)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -101,6 +112,32 @@ func TestFormatOutput_UnwrapsListEnvelope_CSV(t *testing.T) {
 	if !strings.Contains(lines[0], "id") || !strings.Contains(lines[0], "name") {
 		t.Errorf("expected item headers, got %q", lines[0])
 	}
+	// A pagination-less envelope produces no footer.
+	if footer != "" {
+		t.Errorf("expected no footer for pagination-less envelope; got %q", footer)
+	}
+}
+
+// CSV output for paginated list responses must stay parseable (pure rows on
+// stdout) while the pagination cursor is still surfaced via the footer.
+func TestFormatOutput_UnwrapsListEnvelope_CSV_Paginated(t *testing.T) {
+	envelope := map[string]interface{}{
+		"posts": []map[string]interface{}{
+			{"id": "1", "title": "a"},
+		},
+		"nextCursor": "cur",
+		"hasMore":    true,
+	}
+	out, footer, err := FormatOutput(envelope, FormatCSV)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(out, "nextCursor") || strings.Contains(out, "hasMore") {
+		t.Errorf("CSV body must not include pagination metadata; got %q", out)
+	}
+	if !strings.Contains(footer, "nextCursor: cur") || !strings.Contains(footer, "hasMore: true") {
+		t.Errorf("expected pagination footer; got %q", footer)
+	}
 }
 
 func TestFormatOutput_EmptyEnvelope(t *testing.T) {
@@ -109,12 +146,16 @@ func TestFormatOutput_EmptyEnvelope(t *testing.T) {
 		"nextCursor": "",
 		"hasMore":    false,
 	}
-	out, err := FormatOutput(envelope, FormatTable)
+	out, footer, err := FormatOutput(envelope, FormatTable)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "No results") {
 		t.Errorf("expected 'No results' for empty envelope; got %q", out)
+	}
+	// Zero-value pagination fields (final page) should not produce noise.
+	if footer != "" {
+		t.Errorf("expected empty footer for terminal page; got %q", footer)
 	}
 }
 
@@ -125,11 +166,41 @@ func TestFormatOutput_SingleResourceNotUnwrapped(t *testing.T) {
 		"id":    "1",
 		"title": "hello",
 	}
-	out, err := FormatOutput(single, FormatTable)
+	out, _, err := FormatOutput(single, FormatTable)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "ID") || !strings.Contains(out, "TITLE") {
 		t.Errorf("expected single-row table, got %q", out)
+	}
+}
+
+// A single resource like an Idea can have scalar fields (id, title, status)
+// plus an array-of-objects field (labels). It must not be mistaken for a list
+// envelope of labels — the row should show the idea itself, not its labels.
+func TestFormatOutput_SingleResourceWithArrayFieldNotUnwrapped(t *testing.T) {
+	idea := map[string]interface{}{
+		"id":     "idea_1",
+		"title":  "My idea",
+		"status": "draft",
+		"labels": []map[string]interface{}{
+			{"id": "lbl_1", "name": "priority"},
+			{"id": "lbl_2", "name": "growth"},
+		},
+	}
+	out, footer, err := FormatOutput(idea, FormatTable)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "idea_1") || !strings.Contains(out, "My idea") {
+		t.Errorf("expected the idea's own fields to render; got %q", out)
+	}
+	// Must be a single-row table (headers + separator + 1 data row = 3 lines),
+	// not one row per label.
+	if lines := strings.Split(out, "\n"); len(lines) != 3 {
+		t.Errorf("expected 3 lines (headers, separator, one row); got %d: %q", len(lines), out)
+	}
+	if footer != "" {
+		t.Errorf("single resource should produce no pagination footer; got %q", footer)
 	}
 }

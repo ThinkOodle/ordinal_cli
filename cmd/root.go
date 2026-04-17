@@ -106,13 +106,18 @@ func getOutputFormat() output.Format {
 }
 
 // printResult formats and prints the result according to the current output format.
+// Any pagination footer is emitted on stderr so it stays visible in table/csv
+// modes without polluting a parseable CSV body on stdout.
 func printResult(data interface{}) error {
 	format := getOutputFormat()
-	out, err := output.FormatOutput(data, format)
+	out, footer, err := output.FormatOutput(data, format)
 	if err != nil {
 		return fmt.Errorf("formatting output: %w", err)
 	}
 	fmt.Println(out)
+	if footer != "" {
+		fmt.Fprintln(os.Stderr, footer)
+	}
 	return nil
 }
 
