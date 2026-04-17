@@ -18,7 +18,10 @@ func TestInviteService_CRUD(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Fatalf("decoding: %v", err)
 			}
-			return jsonResponse(t, http.StatusOK, models.Invite{ID: "i2", Email: body.Email}), nil
+			return jsonResponse(t, http.StatusOK, models.CreateInviteResponse{
+				Invite:    &models.Invite{ID: "i2", Email: body.Email},
+				SentEmail: true,
+			}), nil
 		case r.Method == http.MethodDelete && r.URL.Path == "/invites/i1":
 			return jsonResponse(t, http.StatusOK, map[string]bool{"success": true}), nil
 		}
@@ -30,10 +33,43 @@ func TestInviteService_CRUD(t *testing.T) {
 		t.Fatalf("list: %v", err)
 	}
 	created, err := svc.Create(models.CreateInviteRequest{Email: "new@example.com"})
-	if err != nil || created.ID != "i2" {
+	if err != nil {
 		t.Fatalf("create: %v", err)
+	}
+	if !created.SentEmail {
+		t.Fatalf("create: expected sentEmail=true, got false")
+	}
+	if created.Invite == nil || created.Invite.ID != "i2" || created.Invite.Email != "new@example.com" {
+		t.Fatalf("create: unexpected invite %+v", created.Invite)
 	}
 	if err := svc.Delete("i1"); err != nil {
 		t.Fatalf("delete: %v", err)
+	}
+}
+
+// TestInviteService_CreateExistingUser covers the documented success path
+// where the invited email already belongs to an Ordinal user: the API adds
+// them to the workspace directly, so invite is null and sentEmail is false.
+func TestInviteService_CreateExistingUser(t *testing.T) {
+	svc := NewInviteService(newTestClient(func(r *http.Request) (*http.Response, error) {
+		if r.Method == http.MethodPost && r.URL.Path == "/invites" {
+			return jsonResponse(t, http.StatusOK, map[string]interface{}{
+				"invite":    nil,
+				"sentEmail": false,
+			}), nil
+		}
+		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		return jsonResponse(t, http.StatusBadRequest, nil), nil
+	}))
+
+	resp, err := svc.Create(models.CreateInviteRequest{Email: "existing@example.com"})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if resp.Invite != nil {
+		t.Fatalf("create: expected nil invite, got %+v", resp.Invite)
+	}
+	if resp.SentEmail {
+		t.Fatalf("create: expected sentEmail=false, got true")
 	}
 }

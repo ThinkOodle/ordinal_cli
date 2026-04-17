@@ -34,18 +34,20 @@ func (s *InviteService) List() ([]models.Invite, error) {
 	return invites, nil
 }
 
-// Create creates a new invite.
-func (s *InviteService) Create(req models.CreateInviteRequest) (*models.Invite, error) {
+// Create creates a new invite. The response envelope carries either a new
+// Invite (when an email was sent) or a null invite with sentEmail=false
+// (when the user already existed and was added to the workspace directly).
+func (s *InviteService) Create(req models.CreateInviteRequest) (*models.CreateInviteResponse, error) {
 	data, err := s.client.Post(invitesBasePath, req)
 	if err != nil {
 		return nil, fmt.Errorf("creating invite: %w", err)
 	}
 
-	var invite models.Invite
-	if err := json.Unmarshal(data, &invite); err != nil {
+	var resp models.CreateInviteResponse
+	if err := json.Unmarshal(data, &resp); err != nil {
 		return nil, fmt.Errorf("parsing created invite: %w", err)
 	}
-	return &invite, nil
+	return &resp, nil
 }
 
 // Delete deletes an invite by ID.

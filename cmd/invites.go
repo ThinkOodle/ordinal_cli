@@ -53,11 +53,11 @@ var inviteCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		invite, err := api.NewInviteService(c).Create(models.CreateInviteRequest{Email: inviteCreateEmail})
+		resp, err := api.NewInviteService(c).Create(models.CreateInviteRequest{Email: inviteCreateEmail})
 		if err != nil {
 			return err
 		}
-		return printResult(invite)
+		return printResult(resp)
 	},
 }
 
