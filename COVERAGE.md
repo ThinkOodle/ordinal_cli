@@ -17,7 +17,7 @@ Notes:
 ## Summary
 
 - Resource groups covered: `19 / 19` (of the in-scope Core REST API)
-- Implemented API operations: `63`
+- Implemented API operations: `64`
 
 ## Covered Resources
 
@@ -35,7 +35,7 @@ Notes:
 | `label` | `GET /labels`, `POST /labels`, `DELETE /labels/{id}` |
 | `linkedin` | `GET /linkedin/profile/{urn}`, `GET /linkedin/{username}/mentions` |
 | `linkedin-leads` | `GET /linkedin/leads/{profileId}/posts`, `GET /linkedin/leads/{profileId}/posts/{postId}` |
-| `post` | `GET /posts`, `POST /posts`, `GET /posts/{id}`, `PATCH /posts/{id}`, `POST /posts/{id}/archive`, `POST /posts/{id}/unarchive`, `POST /posts/{id}/schedule`, `POST /posts/{id}/unschedule` |
+| `post` | `GET /posts`, `POST /posts`, `GET /posts/{id}`, `PATCH /posts/{id}`, `DELETE /posts/{id}`, `POST /posts/{id}/archive`, `POST /posts/{id}/unarchive`, `POST /posts/{id}/schedule`, `POST /posts/{id}/unschedule` |
 | `profile` | `GET /profiles/engagement`, `GET /profiles/scheduling` |
 | `slack-boost` | `GET /posts/{postId}/slack-boosts`, `POST /slack-boosts`, `GET /slack-boosts/{id}`, `PATCH /slack-boosts/{id}`, `DELETE /slack-boosts/{id}` |
 | `slack-webhook` | `GET /slack-webhooks` |

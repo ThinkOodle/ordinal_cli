@@ -42,6 +42,7 @@ ordinal post get --id <uuid>
 ordinal post create --body-file ./post.json
 ordinal post schedule --id <uuid> --publish-at 2026-05-01T10:00:00Z
 ordinal post archive --id <uuid>
+ordinal post delete --id <uuid>
 
 # Ideas
 ordinal idea list --limit 50

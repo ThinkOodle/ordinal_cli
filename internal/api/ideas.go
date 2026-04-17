@@ -70,7 +70,9 @@ func (s *IdeaService) List(params models.ListIdeasParams) (*models.IdeaListRespo
 	return &resp, nil
 }
 
-// ListAll fetches all ideas by auto-paginating.
+// ListAll fetches all ideas by auto-paginating. Fails fast on inconsistent
+// cursor metadata (hasMore=true with empty or repeated nextCursor) rather
+// than spinning forever or silently truncating results.
 func (s *IdeaService) ListAll(params models.ListIdeasParams) ([]models.Idea, error) {
 	var all []models.Idea
 	cursor := params.Cursor
@@ -84,8 +86,14 @@ func (s *IdeaService) ListAll(params models.ListIdeasParams) ([]models.Idea, err
 			return nil, err
 		}
 		all = append(all, resp.Ideas...)
-		if resp.NextCursor == "" || !resp.HasMore {
+		if !resp.HasMore {
 			break
+		}
+		if resp.NextCursor == "" {
+			return nil, fmt.Errorf("paginating ideas: server reported hasMore=true with empty nextCursor")
+		}
+		if resp.NextCursor == cursor {
+			return nil, fmt.Errorf("paginating ideas: server returned repeated cursor %q", cursor)
 		}
 		cursor = resp.NextCursor
 	}

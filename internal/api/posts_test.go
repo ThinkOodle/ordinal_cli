@@ -101,6 +101,73 @@ func TestPostService_Schedule(t *testing.T) {
 	}
 }
 
+// TestPostService_ListAll_EmptyNextCursor locks in that a server response
+// of hasMore=true with an empty nextCursor fails fast, instead of silently
+// truncating results or looping with the same cursor forever.
+func TestPostService_ListAll_EmptyNextCursor(t *testing.T) {
+	svc := NewPostService(newTestClient(func(r *http.Request) (*http.Response, error) {
+		return jsonResponse(t, http.StatusOK, models.PostListResponse{
+			Posts:      []models.Post{{ID: "p1"}},
+			NextCursor: "",
+			HasMore:    true,
+		}), nil
+	}))
+
+	_, err := svc.ListAll(models.ListPostsParams{})
+	if err == nil {
+		t.Fatal("expected error for hasMore=true with empty nextCursor")
+	}
+}
+
+// TestPostService_ListAll_RepeatedCursor locks in that a server returning
+// the same cursor twice breaks out with an error instead of spinning forever.
+func TestPostService_ListAll_RepeatedCursor(t *testing.T) {
+	var calls int
+	svc := NewPostService(newTestClient(func(r *http.Request) (*http.Response, error) {
+		calls++
+		// First page hands out cursor "c1"; second page echoes the same
+		// cursor. The client should stop on the second page.
+		if calls == 1 {
+			return jsonResponse(t, http.StatusOK, models.PostListResponse{
+				Posts:      []models.Post{{ID: "p1"}},
+				NextCursor: "c1",
+				HasMore:    true,
+			}), nil
+		}
+		return jsonResponse(t, http.StatusOK, models.PostListResponse{
+			Posts:      []models.Post{{ID: "p2"}},
+			NextCursor: "c1",
+			HasMore:    true,
+		}), nil
+	}))
+
+	_, err := svc.ListAll(models.ListPostsParams{})
+	if err == nil {
+		t.Fatal("expected error for repeated cursor")
+	}
+	if calls != 2 {
+		t.Errorf("expected 2 calls before bailing, got %d", calls)
+	}
+}
+
+func TestPostService_Delete(t *testing.T) {
+	var method string
+	svc := NewPostService(newTestClient(func(r *http.Request) (*http.Response, error) {
+		method = r.Method
+		if r.URL.Path != "/posts/abc" {
+			t.Errorf("expected /posts/abc, got %s", r.URL.Path)
+		}
+		return jsonResponse(t, http.StatusOK, map[string]string{"id": "abc"}), nil
+	}))
+
+	if _, err := svc.Delete("abc"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if method != http.MethodDelete {
+		t.Errorf("expected DELETE, got %s", method)
+	}
+}
+
 func TestPostService_ArchiveUnarchiveUnschedule(t *testing.T) {
 	paths := map[string]string{}
 	svc := NewPostService(newTestClient(func(r *http.Request) (*http.Response, error) {

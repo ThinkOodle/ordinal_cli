@@ -27,6 +27,52 @@ func TestIdeaService_List(t *testing.T) {
 	}
 }
 
+// TestIdeaService_ListAll_EmptyNextCursor locks in that a server response
+// of hasMore=true with an empty nextCursor fails fast.
+func TestIdeaService_ListAll_EmptyNextCursor(t *testing.T) {
+	svc := NewIdeaService(newTestClient(func(r *http.Request) (*http.Response, error) {
+		return jsonResponse(t, http.StatusOK, models.IdeaListResponse{
+			Ideas:      []models.Idea{{ID: "i1"}},
+			NextCursor: "",
+			HasMore:    true,
+		}), nil
+	}))
+
+	_, err := svc.ListAll(models.ListIdeasParams{})
+	if err == nil {
+		t.Fatal("expected error for hasMore=true with empty nextCursor")
+	}
+}
+
+// TestIdeaService_ListAll_RepeatedCursor locks in that a server returning
+// the same cursor twice breaks out with an error instead of spinning forever.
+func TestIdeaService_ListAll_RepeatedCursor(t *testing.T) {
+	var calls int
+	svc := NewIdeaService(newTestClient(func(r *http.Request) (*http.Response, error) {
+		calls++
+		if calls == 1 {
+			return jsonResponse(t, http.StatusOK, models.IdeaListResponse{
+				Ideas:      []models.Idea{{ID: "i1"}},
+				NextCursor: "c1",
+				HasMore:    true,
+			}), nil
+		}
+		return jsonResponse(t, http.StatusOK, models.IdeaListResponse{
+			Ideas:      []models.Idea{{ID: "i2"}},
+			NextCursor: "c1",
+			HasMore:    true,
+		}), nil
+	}))
+
+	_, err := svc.ListAll(models.ListIdeasParams{})
+	if err == nil {
+		t.Fatal("expected error for repeated cursor")
+	}
+	if calls != 2 {
+		t.Errorf("expected 2 calls before bailing, got %d", calls)
+	}
+}
+
 func TestIdeaService_AddToCalendar(t *testing.T) {
 	svc := NewIdeaService(newTestClient(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Path != "/ideas/abc/add-to-calendar" {

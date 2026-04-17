@@ -56,6 +56,7 @@ func init() {
 	postCmd.AddCommand(postUnarchiveCmd)
 	postCmd.AddCommand(postScheduleCmd)
 	postCmd.AddCommand(postUnscheduleCmd)
+	postCmd.AddCommand(postDeleteCmd)
 
 	postListCmd.Flags().IntVar(&postListLimit, "limit", 0, "Max posts to return (1-100)")
 	postListCmd.Flags().StringVar(&postListCursor, "cursor", "", "Pagination cursor from a prior response")
@@ -108,6 +109,9 @@ func init() {
 
 	postUnscheduleCmd.Flags().StringVar(&postID, "id", "", "Post ID (UUID)")
 	postUnscheduleCmd.MarkFlagRequired("id")
+
+	postDeleteCmd.Flags().StringVar(&postID, "id", "", "Post ID (UUID)")
+	postDeleteCmd.MarkFlagRequired("id")
 }
 
 var postCmd = &cobra.Command{
@@ -337,6 +341,23 @@ var postUnscheduleCmd = &cobra.Command{
 			return err
 		}
 		data, err := api.NewPostService(c).Unschedule(postID)
+		if err != nil {
+			return err
+		}
+		return printRawJSON(data)
+	},
+}
+
+var postDeleteCmd = &cobra.Command{
+	Use:   "delete",
+	Short: "Permanently delete a post",
+	Long:  "Permanently delete a post by ID. Prefer 'archive' for a 30-day recovery window; 'delete' is irreversible.",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := newClient()
+		if err != nil {
+			return err
+		}
+		data, err := api.NewPostService(c).Delete(postID)
 		if err != nil {
 			return err
 		}

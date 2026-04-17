@@ -157,7 +157,7 @@ func TestParseRetryAfter(t *testing.T) {
 		ok     bool
 	}{
 		{"seconds", "5", 5 * time.Second, true},
-		{"zero seconds", "0", 0, true},
+		{"zero seconds ignored", "0", 0, false},
 		{"negative seconds ignored", "-3", 0, false},
 		{"http-date future", now.Add(10 * time.Second).UTC().Format(http.TimeFormat), 10 * time.Second, true},
 		{"http-date past ignored", now.Add(-1 * time.Second).UTC().Format(http.TimeFormat), 0, false},
@@ -175,6 +175,48 @@ func TestParseRetryAfter(t *testing.T) {
 				t.Errorf("duration: got %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestClient_RateLimitBackoffSurvivesZeroRetryAfter locks in that a server
+// returning "Retry-After: 0" does NOT collapse the retry loop into a
+// zero-delay hammer. We set a small-but-nonzero initial backoff and assert
+// that the elapsed time between retries reflects that backoff rather than
+// racing through them instantly.
+func TestClient_RateLimitBackoffSurvivesZeroRetryAfter(t *testing.T) {
+	orig := initialBackoffValue
+	initialBackoffValue = 25 * time.Millisecond
+	t.Cleanup(func() { initialBackoffValue = orig })
+
+	var attempts int32
+	var timestamps []time.Time
+	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		timestamps = append(timestamps, time.Now())
+		n := atomic.AddInt32(&attempts, 1)
+		if n < 3 {
+			return rateLimitResponse(), nil
+		}
+		return okResponse(`{"ok":true}`), nil
+	})
+	c := New("k",
+		WithBaseURL("http://api.test"),
+		WithHTTPClient(&http.Client{Transport: transport}),
+	)
+
+	if _, err := c.Get("/things", nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := atomic.LoadInt32(&attempts); got != 3 {
+		t.Fatalf("expected 3 attempts, got %d", got)
+	}
+	// First retry should respect initialBackoffValue; second should double it.
+	// Use generous lower bounds to avoid flakiness but still catch the bug,
+	// which produced zero-gap retries.
+	if gap := timestamps[1].Sub(timestamps[0]); gap < 20*time.Millisecond {
+		t.Errorf("first retry gap %v collapsed below initial backoff", gap)
+	}
+	if gap := timestamps[2].Sub(timestamps[1]); gap < 40*time.Millisecond {
+		t.Errorf("second retry gap %v did not double initial backoff", gap)
 	}
 }
 

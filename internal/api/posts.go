@@ -82,7 +82,9 @@ func (s *PostService) List(params models.ListPostsParams) (*models.PostListRespo
 	return &resp, nil
 }
 
-// ListAll fetches all posts by auto-paginating.
+// ListAll fetches all posts by auto-paginating. Fails fast on inconsistent
+// cursor metadata (hasMore=true with empty or repeated nextCursor) rather
+// than spinning forever or silently truncating results.
 func (s *PostService) ListAll(params models.ListPostsParams) ([]models.Post, error) {
 	var all []models.Post
 	cursor := params.Cursor
@@ -96,8 +98,14 @@ func (s *PostService) ListAll(params models.ListPostsParams) ([]models.Post, err
 			return nil, err
 		}
 		all = append(all, resp.Posts...)
-		if resp.NextCursor == "" || !resp.HasMore {
+		if !resp.HasMore {
 			break
+		}
+		if resp.NextCursor == "" {
+			return nil, fmt.Errorf("paginating posts: server reported hasMore=true with empty nextCursor")
+		}
+		if resp.NextCursor == cursor {
+			return nil, fmt.Errorf("paginating posts: server returned repeated cursor %q", cursor)
 		}
 		cursor = resp.NextCursor
 	}
@@ -170,6 +178,15 @@ func (s *PostService) Unschedule(id string) (json.RawMessage, error) {
 	data, err := s.client.Post(postsBasePath+"/"+id+"/unschedule", nil)
 	if err != nil {
 		return nil, fmt.Errorf("unscheduling post: %w", err)
+	}
+	return data, nil
+}
+
+// Delete permanently deletes a post by ID.
+func (s *PostService) Delete(id string) (json.RawMessage, error) {
+	data, err := s.client.Delete(postsBasePath + "/" + id)
+	if err != nil {
+		return nil, fmt.Errorf("deleting post: %w", err)
 	}
 	return data, nil
 }

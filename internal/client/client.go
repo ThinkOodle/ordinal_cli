@@ -168,11 +168,11 @@ func (c *Client) doJSON(method, path string, body interface{}) ([]byte, error) {
 // it would force the client to fall back to its own backoff and retry sooner
 // than the server asked.
 //
-// Past or malformed dates return ok=false so the caller keeps its existing
-// backoff rather than racing forward with a zero wait.
+// Non-positive, past, or malformed values return ok=false so the caller keeps
+// its existing backoff rather than collapsing into a zero-delay busy loop.
 func parseRetryAfter(v string, now time.Time) (time.Duration, bool) {
 	if seconds, err := strconv.Atoi(v); err == nil {
-		if seconds < 0 {
+		if seconds <= 0 {
 			return 0, false
 		}
 		return time.Duration(seconds) * time.Second, true

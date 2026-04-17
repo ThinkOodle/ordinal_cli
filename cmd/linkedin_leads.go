@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/spf13/cobra"
 )
@@ -47,6 +49,12 @@ var linkedInLeadsListPostsCmd = &cobra.Command{
 	Use:   "list-posts",
 	Short: "List LinkedIn posts available for leads scraping on a profile",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Enforce the advertised 1-100 range locally so out-of-range values
+		// fail with a clear error instead of being silently dropped from the
+		// query (which would return server defaults and confuse callers).
+		if llLimit < 0 || llLimit > 100 {
+			return fmt.Errorf("--limit must be between 1 and 100")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -68,6 +76,12 @@ var linkedInLeadsGetLeadsCmd = &cobra.Command{
 	Use:   "get-leads",
 	Short: "Get leads (engagers) for a LinkedIn post",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if llLimit < 0 || llLimit > 250 {
+			return fmt.Errorf("--limit must be between 1 and 250")
+		}
+		if llMinFollowerCount < 0 {
+			return fmt.Errorf("--min-follower-count must be non-negative")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err
