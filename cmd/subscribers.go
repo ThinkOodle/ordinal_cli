@@ -76,7 +76,7 @@ var subscriberCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }
 

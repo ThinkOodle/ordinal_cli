@@ -220,6 +220,100 @@ func TestClient_RateLimitBackoffSurvivesZeroRetryAfter(t *testing.T) {
 	}
 }
 
+// withMaxTotalDuration shrinks the overall retry budget for a single test so
+// we can observe the budget-exceeded path without waiting seconds.
+func withMaxTotalDuration(t *testing.T, d time.Duration) {
+	t.Helper()
+	orig := maxTotalDuration
+	maxTotalDuration = d
+	t.Cleanup(func() { maxTotalDuration = orig })
+}
+
+// TestClient_RetryLoopIsBoundedByTotalDuration guards the fix for the
+// unbounded-retry-time bug: a long run of 429s combined with exponential
+// backoff could make a single command blow well past its advertised 30s
+// timeout. The whole do() call must now be capped by maxTotalDuration.
+// We set the budget very small and use a non-trivial initial backoff so
+// that after one or two retries the budget runs out; the request must
+// fail well inside the budget window rather than plowing through all 5
+// retries.
+func TestClient_RetryLoopIsBoundedByTotalDuration(t *testing.T) {
+	withMaxTotalDuration(t, 150*time.Millisecond)
+	orig := initialBackoffValue
+	initialBackoffValue = 80 * time.Millisecond
+	t.Cleanup(func() { initialBackoffValue = orig })
+
+	var attempts int32
+	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		atomic.AddInt32(&attempts, 1)
+		return rateLimitResponse(), nil
+	})
+	c := New("k",
+		WithBaseURL("http://api.test"),
+		WithHTTPClient(&http.Client{Transport: transport}),
+	)
+
+	start := time.Now()
+	_, err := c.Get("/things", nil)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected error when budget exhausted by repeated 429s")
+	}
+	// 80ms + 160ms > 150ms budget, so we should bail after at most 2
+	// attempts. Give a generous cap to absorb scheduler noise while still
+	// catching the regression (which would run all 6 attempts).
+	if got := atomic.LoadInt32(&attempts); got > 2 {
+		t.Errorf("expected retries to stop inside budget; got %d attempts", got)
+	}
+	// The total call must not drag on far beyond the budget. If the sleep
+	// is no longer interruptible / pre-checked, this test will catch it.
+	if elapsed > 400*time.Millisecond {
+		t.Errorf("do() took %v; expected to stay near the 150ms budget", elapsed)
+	}
+}
+
+// TestClient_OversizedRetryAfterDoesNotBlock guards against honoring a server
+// Retry-After that would exceed the overall budget. Without the pre-sleep
+// budget check, a Retry-After of "60" would make the CLI block for a full
+// minute before ultimately timing out — this test asserts we bail promptly
+// instead.
+func TestClient_OversizedRetryAfterDoesNotBlock(t *testing.T) {
+	withMaxTotalDuration(t, 100*time.Millisecond)
+	orig := initialBackoffValue
+	initialBackoffValue = 1 * time.Millisecond
+	t.Cleanup(func() { initialBackoffValue = orig })
+
+	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusTooManyRequests,
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+				// 60 seconds — dwarfs the 100ms test budget.
+				"Retry-After": []string{"60"},
+			},
+			Body: io.NopCloser(strings.NewReader(`{"error":{"message":"rate limited"}}`)),
+		}, nil
+	})
+	c := New("k",
+		WithBaseURL("http://api.test"),
+		WithHTTPClient(&http.Client{Transport: transport}),
+	)
+
+	start := time.Now()
+	_, err := c.Get("/things", nil)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected error from 429 storm")
+	}
+	// Must bail well before Retry-After would elapse. Anything longer than
+	// a handful of budget windows signals we actually slept on Retry-After.
+	if elapsed > 1*time.Second {
+		t.Errorf("call blocked for %v on an oversized Retry-After; expected near-immediate bail", elapsed)
+	}
+}
+
 func TestClient_IsIdempotent(t *testing.T) {
 	for _, m := range []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodDelete, http.MethodOptions} {
 		if !isIdempotent(m) {

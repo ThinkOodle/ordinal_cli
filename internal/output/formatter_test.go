@@ -249,6 +249,155 @@ func TestFormatOutput_NestedSliceRendersAsJSON_CSV(t *testing.T) {
 	}
 }
 
+// Posts and comments routinely carry multiline text (the Ordinal OpenAPI
+// examples themselves include embedded newlines). Writing those cells
+// verbatim into a table splits one row across several terminal lines and
+// destroys column alignment. Table output must collapse \n/\r/\t to spaces
+// so each logical row stays on a single line — and CSV must leave them
+// alone so csv.Writer-quoted content round-trips unchanged.
+func TestFormatOutput_TableNormalizesMultilineCells(t *testing.T) {
+	items := []map[string]interface{}{
+		{"id": "1", "text": "line one\nline two\r\nline three"},
+		{"id": "2", "text": "tabbed\tvalue"},
+	}
+	out, _, err := FormatOutput(items, FormatTable)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Expect exactly header + separator + 2 data rows = 4 lines. Embedded
+	// newlines would have inflated this; that's the regression.
+	if got := strings.Count(out, "\n"); got != 3 {
+		t.Errorf("expected 3 newlines (1 header + 1 separator + 2 rows - 1 trimmed trailing); got %d in %q", got, out)
+	}
+	if strings.Contains(out, "line one\n") || strings.Contains(out, "tabbed\t") {
+		t.Errorf("table cells must not contain raw newlines/tabs; got %q", out)
+	}
+	// All segments of the multiline value should still be present on a
+	// single line so readers can see the full content. Each control rune
+	// becomes one space, so \r\n collapses to two spaces — assert presence
+	// of each segment rather than an exact joiner.
+	for _, want := range []string{"line one", "line two", "line three", "tabbed value"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output; got %q", want, out)
+		}
+	}
+}
+
+func TestFormatOutput_CSVPreservesMultilineCells(t *testing.T) {
+	items := []map[string]interface{}{
+		{"id": "1", "text": "line one\nline two"},
+	}
+	out, _, err := FormatOutput(items, FormatCSV)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := csv.NewReader(strings.NewReader(out))
+	records, err := r.ReadAll()
+	if err != nil {
+		t.Fatalf("parsing csv: %v", err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("expected header + 1 row; got %d", len(records))
+	}
+	textIdx := -1
+	for i, h := range records[0] {
+		if h == "text" {
+			textIdx = i
+		}
+	}
+	if textIdx < 0 {
+		t.Fatalf("text column missing: %v", records[0])
+	}
+	if got := records[1][textIdx]; got != "line one\nline two" {
+		t.Errorf("CSV must preserve embedded newlines for round-tripping; got %q", got)
+	}
+}
+
+// Emoji and CJK runes occupy two terminal columns in a monospace font. Byte
+// length undercounts them, so a table with emoji in one cell and a wider
+// plain-ASCII cell beneath it would mis-align — either the emoji row gets
+// over-padded (byte-padded past the column) or the column under-reserves
+// space. Width accounting must be display-based.
+func TestFormatOutput_TableAlignsEmojiAndCJK(t *testing.T) {
+	items := []map[string]interface{}{
+		{"id": "1", "name": "🚀"},
+		{"id": "2", "name": "中文"},
+		{"id": "3", "name": "abcd"},
+	}
+	out, _, err := FormatOutput(items, FormatTable)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lines := strings.Split(out, "\n")
+	// header, separator, 3 rows.
+	if len(lines) != 5 {
+		t.Fatalf("expected 5 lines; got %d: %q", len(lines), out)
+	}
+	// Every line must occupy the same number of display columns — that is
+	// the whole point of padding. If widths were computed byte-wise, the
+	// rows containing multi-byte emoji/CJK would come up short on display
+	// columns and the row containing "abcd" would be wider.
+	refCols := displayWidth(lines[0])
+	for i, l := range lines {
+		if w := displayWidth(l); w != refCols {
+			t.Errorf("line %d has %d display cols, expected %d: %q", i, w, refCols, l)
+		}
+	}
+}
+
+func TestDisplayWidth(t *testing.T) {
+	cases := []struct {
+		in   string
+		want int
+	}{
+		{"", 0},
+		{"abc", 3},
+		{"🚀", 2},
+		{"中文", 4},
+		{"café", 4},                           // 'é' precomposed: narrow
+		{"cafe\u0301", 4},                    // 'e' + combining acute: combining mark is 0-width
+		{"a\u200Db", 2},                      // ZWJ is 0-width
+		{"\u270C\uFE0F", 1},                  // victory hand U+270C (Neutral kind here) + VS-16 — VS is 0; base is narrow per EAW
+		{"hi\tthere", 7},                     // control char (\t) treated as 0; we sanitize before measuring anyway
+	}
+	for _, c := range cases {
+		if got := displayWidth(c.in); got != c.want {
+			t.Errorf("displayWidth(%q) = %d; want %d", c.in, got, c.want)
+		}
+	}
+}
+
+// A 204-style empty-body response from a read endpoint can manifest as an
+// empty JSON object after a round-trip through json.Unmarshal. The formatter
+// must not error for table/csv rendering; it should simply say "No results"
+// so the CLI can pass {} through unchanged for reads without a format-
+// dependent crash.
+func TestFormatOutput_EmptyObjectRendersAsNoResults(t *testing.T) {
+	empty := map[string]interface{}{}
+	out, footer, err := FormatOutput(empty, FormatTable)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "No results") {
+		t.Errorf("expected 'No results'; got %q", out)
+	}
+	if footer != "" {
+		t.Errorf("expected no footer; got %q", footer)
+	}
+
+	out, footer, err = FormatOutput(empty, FormatCSV)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out != "" {
+		t.Errorf("expected empty csv body; got %q", out)
+	}
+	if footer != "" {
+		t.Errorf("expected no footer; got %q", footer)
+	}
+}
+
 func TestFormatOutput_SingleResourceNotUnwrapped(t *testing.T) {
 	// A single-object response (e.g. GET /post/:id) has no array child and
 	// must remain a one-row table with its own fields, not an error.

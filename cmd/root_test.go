@@ -226,13 +226,10 @@ func TestBodyJSONFlagPrecedence_CreatePattern(t *testing.T) {
 }
 
 // TestPrintRawJSON_EmptyBodyIsSuccess locks in that a 204-style zero-length
-// response — or a 200 "{}" response — is treated as a structured success
-// rather than a parse error or a bare map that extractRows cannot render.
-// Any mutation endpoint that legitimately returns no body content (common
-// for DELETE and some idempotent POSTs) routes through printRawJSON, so one
-// case per format here guards the whole set from regressing to "unexpected
-// end of JSON input" (empty body) or "unsupported data type" (empty object
-// under --output table/csv).
+// response from a read endpoint is treated as a structured success rather
+// than a parse error. Empty-body handling is shared across every format so
+// one run per format guards all three render paths from regressing to
+// "unexpected end of JSON input".
 func TestPrintRawJSON_EmptyBodyIsSuccess(t *testing.T) {
 	// printRawJSON is called directly without going through Execute, so
 	// appConfig isn't re-populated by PersistentPreRunE. Bypass state bled
@@ -245,7 +242,6 @@ func TestPrintRawJSON_EmptyBodyIsSuccess(t *testing.T) {
 		"empty":      {},
 		"spaces":     []byte("   "),
 		"whitespace": []byte("\n\t"),
-		"empty_obj":  []byte("{}"),
 	}
 	formats := []string{"json", "table", "csv"}
 	for name, data := range bodies {
@@ -256,6 +252,89 @@ func TestPrintRawJSON_EmptyBodyIsSuccess(t *testing.T) {
 					t.Errorf("empty body should succeed, got: %v", err)
 				}
 			})
+		}
+	}
+}
+
+// TestPrintRawJSON_EmptyObjectPassesThrough guards the fix for the read-path
+// bug where printRawJSON was rewriting any {} response into {"success": true}.
+// For read endpoints a legitimate empty object is data, not an ack — we want
+// the user to see it as-is. Regression risk: reintroducing the old
+// collapse-to-success shortcut inside printRawJSON.
+func TestPrintRawJSON_EmptyObjectPassesThrough(t *testing.T) {
+	prev := appConfig
+	t.Cleanup(func() { appConfig = prev })
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	appConfig = &config.Config{OutputFormat: "json"}
+	if err := printRawJSON([]byte("{}")); err != nil {
+		t.Fatalf("printRawJSON: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	var got map[string]interface{}
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("decoding json: %v (%q)", err, buf.String())
+	}
+	if len(got) != 0 {
+		t.Errorf("expected {} to pass through unchanged; got %v", got)
+	}
+	if _, ok := got["success"]; ok {
+		t.Errorf("read helper must not invent a success key for {}; got %v", got)
+	}
+}
+
+// TestPrintMutationAck_EmptyResponsesAck locks in that create/update/delete
+// endpoints that answer with an empty body OR {} still produce a structured
+// acknowledgement. This is the other half of the read/mutation split: mutation
+// endpoints conventionally return {} on success, and the CLI must surface
+// that as a clear confirmation rather than "No results".
+func TestPrintMutationAck_EmptyResponsesAck(t *testing.T) {
+	prev := appConfig
+	t.Cleanup(func() { appConfig = prev })
+
+	for _, body := range [][]byte{nil, {}, []byte("   "), []byte("{}")} {
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatalf("pipe: %v", err)
+		}
+		origStdout := os.Stdout
+		os.Stdout = w
+		appConfig = &config.Config{OutputFormat: "json"}
+
+		if err := printMutationAck(body); err != nil {
+			os.Stdout = origStdout
+			t.Fatalf("printMutationAck(%q): %v", body, err)
+		}
+		if err := w.Close(); err != nil {
+			os.Stdout = origStdout
+			t.Fatalf("close: %v", err)
+		}
+		os.Stdout = origStdout
+
+		var buf bytes.Buffer
+		if _, err := buf.ReadFrom(r); err != nil {
+			t.Fatalf("read: %v", err)
+		}
+		var got map[string]interface{}
+		if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+			t.Fatalf("decoding json from %q: %v (%q)", body, err, buf.String())
+		}
+		if s, _ := got["success"].(bool); !s {
+			t.Errorf("expected success ack for %q; got %v", body, got)
 		}
 	}
 }

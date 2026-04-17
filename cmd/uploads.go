@@ -44,7 +44,7 @@ var uploadCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }
 
@@ -64,15 +64,33 @@ var uploadGetCmd = &cobra.Command{
 	},
 }
 
-// printRawJSON parses a raw JSON payload and formats it via printResult.
-// A zero-length (or whitespace-only) body — what the API returns for 204
-// No Content — is treated as a successful acknowledgement rather than a
-// parse error, so delete/update endpoints that intentionally return no body
-// still exit 0 with a machine-readable confirmation. An empty JSON object
-// ({}) gets the same treatment: extractRows has no columns to render from
-// a zero-field map, so --output table/csv would otherwise fail on a
-// successful mutation that simply returns no body fields.
+// printRawJSON parses a raw JSON payload and formats it via printResult. Use
+// this for GET/read endpoints: a zero-length body — what the API returns for
+// 204 No Content — is treated as a successful acknowledgement rather than a
+// parse error, but a legitimate empty JSON object ({}) passes through
+// unchanged so the caller sees whatever the API actually returned. Mutation
+// endpoints that conventionally respond with {} on success should call
+// printMutationAck instead.
 func printRawJSON(data []byte) error {
+	if len(bytes.TrimSpace(data)) == 0 {
+		return printResult(map[string]interface{}{"success": true})
+	}
+	var v interface{}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return fmt.Errorf("parsing response: %w", err)
+	}
+	return printResult(v)
+}
+
+// printMutationAck parses a raw JSON payload from a create/update/delete
+// endpoint and formats it via printResult. Like printRawJSON it treats a
+// zero-length body as success, but it also collapses an empty JSON object
+// ({}) to the same acknowledgement — the Ordinal API returns {} from several
+// mutation paths on success, and without this the table/csv formatters
+// would render "No results" where the user expects a clear confirmation.
+// Read endpoints must NOT use this helper: they may legitimately return {}
+// as the real response, and we want to preserve that fidelity.
+func printMutationAck(data []byte) error {
 	if len(bytes.TrimSpace(data)) == 0 {
 		return printResult(map[string]interface{}{"success": true})
 	}

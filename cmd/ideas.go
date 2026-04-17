@@ -192,7 +192,7 @@ var ideaCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }
 
@@ -227,7 +227,7 @@ var ideaUpdateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }
 
@@ -243,7 +243,7 @@ var ideaArchiveCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }
 
@@ -259,7 +259,7 @@ var ideaUnarchiveCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }
 
@@ -275,6 +275,6 @@ var ideaAddToCalendarCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }

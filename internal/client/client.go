@@ -4,6 +4,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,6 +29,14 @@ const (
 // initialBackoffValue is the starting backoff duration for retries. It is a
 // var so tests can shrink it to make retry timing deterministic.
 var initialBackoffValue = 2 * time.Second
+
+// maxTotalDuration bounds the wall-clock time a single do() call is allowed
+// to consume, retries and backoff sleeps included. Without it the naive
+// exponential schedule (2+4+8+16+32s) — or an adversarially large
+// Retry-After — could stretch a "30s" command to well over a minute.
+// Exposed as a var so tests can shrink it to keep retry-budget assertions
+// fast.
+var maxTotalDuration = DefaultTimeout
 
 // Client is an HTTP client for the Ordinal API.
 type Client struct {
@@ -207,6 +216,13 @@ func isIdempotent(method string) bool {
 // Non-idempotent methods (POST, PATCH) are NOT retried on transport errors:
 // the server may have already processed the request, and retrying would
 // duplicate side effects like creating or modifying resources.
+//
+// The entire call is bounded by maxTotalDuration via a context deadline that
+// is threaded into the HTTP request and into the interruptible sleep between
+// retries. That deadline caps the sum of all in-flight request durations,
+// exponential-backoff sleeps, and any server-supplied Retry-After hints so a
+// run of rate limits (or an adversarially large Retry-After) cannot blow the
+// CLI's advertised per-command timeout.
 func (c *Client) do(req *http.Request) ([]byte, error) {
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Accept", "application/json")
@@ -215,16 +231,42 @@ func (c *Client) do(req *http.Request) ([]byte, error) {
 		fmt.Fprintf(os.Stderr, ">> %s %s\n", req.Method, req.URL.String())
 	}
 
+	ctx, cancel := context.WithTimeout(req.Context(), maxTotalDuration)
+	defer cancel()
+	req = req.WithContext(ctx)
+
 	idempotent := isIdempotent(req.Method)
 	var lastErr error
 	backoff := initialBackoffValue
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
+			// Bail before sleeping when the remaining budget can't cover the
+			// next backoff — otherwise we'd pay the full wait just to surface
+			// the same error once ctx.Done() fires. This also stops an
+			// oversized Retry-After from blocking until the timer ticks.
+			if deadline, ok := ctx.Deadline(); ok {
+				if remaining := time.Until(deadline); remaining <= 0 || backoff >= remaining {
+					if lastErr == nil {
+						lastErr = ctx.Err()
+					}
+					return nil, fmt.Errorf("request budget exceeded after %d attempts: %w", attempt, lastErr)
+				}
+			}
+
 			if c.verbose {
 				fmt.Fprintf(os.Stderr, ">> retry %d/%d after %s\n", attempt, maxRetries, backoff)
 			}
-			time.Sleep(backoff)
+			timer := time.NewTimer(backoff)
+			select {
+			case <-timer.C:
+			case <-ctx.Done():
+				timer.Stop()
+				if lastErr == nil {
+					lastErr = ctx.Err()
+				}
+				return nil, fmt.Errorf("request budget exceeded after %d attempts: %w", attempt, lastErr)
+			}
 			backoff *= 2
 
 			if req.GetBody != nil {

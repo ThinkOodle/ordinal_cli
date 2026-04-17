@@ -242,7 +242,7 @@ var postCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }
 
@@ -286,7 +286,7 @@ var postUpdateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }
 
@@ -302,7 +302,7 @@ var postArchiveCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }
 
@@ -318,7 +318,7 @@ var postUnarchiveCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }
 
@@ -334,7 +334,7 @@ var postScheduleCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }
 
@@ -350,7 +350,7 @@ var postUnscheduleCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }
 
@@ -367,6 +367,6 @@ var postDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }

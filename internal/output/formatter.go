@@ -9,6 +9,9 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"unicode"
+
+	"golang.org/x/text/width"
 )
 
 // Format represents an output format.
@@ -69,6 +72,13 @@ func formatJSON(data interface{}) (string, error) {
 // formatTable formats data as an aligned text table. The second return value
 // is a non-empty footer string when list-envelope pagination metadata was
 // unwrapped alongside the rows.
+//
+// Cell values are passed through sanitizeTableCell first so embedded newlines
+// and tabs don't break column alignment — multiline payloads (e.g. post or
+// comment text) would otherwise split one logical row across several terminal
+// lines. Column widths and padding are computed with displayWidth so that
+// emoji and CJK runes (width 2 cells) line up correctly; byte length would
+// undercount them and misalign the table.
 func formatTable(data interface{}) (string, string, error) {
 	rows, headers, meta, err := extractRows(data)
 	if err != nil {
@@ -78,14 +88,20 @@ func formatTable(data interface{}) (string, string, error) {
 		return "No results", formatFooter(meta), nil
 	}
 
+	for _, row := range rows {
+		for i, cell := range row {
+			row[i] = sanitizeTableCell(cell)
+		}
+	}
+
 	widths := make([]int, len(headers))
 	for i, h := range headers {
-		widths[i] = len(h)
+		widths[i] = displayWidth(strings.ToUpper(h))
 	}
 	for _, row := range rows {
 		for i, cell := range row {
-			if len(cell) > widths[i] {
-				widths[i] = len(cell)
+			if w := displayWidth(cell); w > widths[i] {
+				widths[i] = w
 			}
 		}
 	}
@@ -119,6 +135,20 @@ func formatTable(data interface{}) (string, string, error) {
 	}
 
 	return strings.TrimRight(buf.String(), "\n"), formatFooter(meta), nil
+}
+
+// sanitizeTableCell collapses line-breaking whitespace so a single logical row
+// never spans multiple terminal lines. CSV output deliberately skips this step
+// because csv.Writer already quotes embedded newlines, and CSV consumers
+// expect the content to round-trip unchanged.
+func sanitizeTableCell(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch r {
+		case '\n', '\r', '\t', '\v', '\f':
+			return ' '
+		}
+		return r
+	}, s)
 }
 
 // formatCSV formats data as CSV. The second return value is a non-empty
@@ -190,7 +220,14 @@ func extractRows(data interface{}) ([][]string, []string, map[string]interface{}
 	}
 
 	var item map[string]interface{}
-	if err := json.Unmarshal(b, &item); err == nil && len(item) > 0 {
+	if err := json.Unmarshal(b, &item); err == nil && item != nil {
+		// An empty object ({}) has no fields to render as a table row. Return
+		// no rows (and no error) so formatTable falls back to "No results";
+		// callers that want to render {} as a mutation acknowledgement should
+		// translate it before reaching the formatter.
+		if len(item) == 0 {
+			return nil, nil, nil, nil
+		}
 		if unwrapped, meta, ok := unwrapListEnvelope(item); ok {
 			if len(unwrapped) == 0 {
 				return nil, nil, meta, nil
@@ -358,10 +395,43 @@ func formatCell(v interface{}) string {
 	return string(b)
 }
 
-// padRight pads a string with spaces to the given width.
-func padRight(s string, width int) string {
-	if len(s) >= width {
+// padRight pads s with spaces so it occupies target display columns in a
+// monospace terminal. Byte-length padding would undercount wide runes (CJK
+// ideographs, emoji) and over-pad narrow rows, visibly misaligning columns
+// whenever social-content payloads contain either.
+func padRight(s string, target int) string {
+	w := displayWidth(s)
+	if w >= target {
 		return s
 	}
-	return s + strings.Repeat(" ", width-len(s))
+	return s + strings.Repeat(" ", target-w)
+}
+
+// displayWidth returns the number of terminal columns s occupies in a
+// monospace font. Combining marks, zero-width joiners, and variation
+// selectors contribute 0; East Asian Wide/Fullwidth runes (which includes
+// most emoji) contribute 2; everything else contributes 1.
+//
+// This is a grapheme-unaware approximation — ZWJ-joined emoji sequences (e.g.
+// 👨‍👩‍👧‍👦) collapse to width 2 in practice but the component emoji each read as
+// width 2 here, which can over-count by a small margin. Accepting that is the
+// trade-off for not pulling in a segmentation library; under-counting (what
+// byte-length does today) was the bug worth fixing.
+func displayWidth(s string) int {
+	total := 0
+	for _, r := range s {
+		if r < 0x20 || r == 0x7F {
+			continue
+		}
+		if unicode.In(r, unicode.Mn, unicode.Me, unicode.Cf) {
+			continue
+		}
+		switch width.LookupRune(r).Kind() {
+		case width.EastAsianWide, width.EastAsianFullwidth:
+			total += 2
+		default:
+			total++
+		}
+	}
+	return total
 }

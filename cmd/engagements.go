@@ -108,7 +108,7 @@ var engagementCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }
 
@@ -131,7 +131,7 @@ var engagementUpdateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printRawJSON(data)
+		return printMutationAck(data)
 	},
 }
 
