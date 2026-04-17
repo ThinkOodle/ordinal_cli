@@ -81,6 +81,37 @@ func TestLoad_BrokenConfigPreservesEnvAPIKey(t *testing.T) {
 	}
 }
 
+// TestSaveAPIKey_RefusesToClobberMalformedConfig locks in that SaveAPIKey
+// refuses to overwrite an existing config file it can't parse, so that a
+// broken YAML file doesn't cause other settings (e.g. output_format) to be
+// silently wiped when the user runs `ordinal auth`.
+func TestSaveAPIKey_RefusesToClobberMalformedConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	dir := filepath.Join(home, ".config", configDirName)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	path := filepath.Join(dir, configFileName+"."+configFileType)
+	original := []byte("api_key: [not: valid\noutput_format: csv\n")
+	if err := os.WriteFile(path, original, 0600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	if err := SaveAPIKey("new-key"); err == nil {
+		t.Fatal("expected error when existing config is malformed")
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reread: %v", err)
+	}
+	if string(got) != string(original) {
+		t.Errorf("existing config should be preserved on parse failure; got:\n%s", got)
+	}
+}
+
 func TestGetAPIKey_Priority(t *testing.T) {
 	cfg := &Config{APIKey: "from-config"}
 	if got, err := GetAPIKey("flag-key", cfg); err != nil || got != "flag-key" {

@@ -150,6 +150,35 @@ func TestPostService_ListAll_RepeatedCursor(t *testing.T) {
 	}
 }
 
+// TestPostService_ListAll_TwoCursorCycle locks in that a server alternating
+// between two cursors (A -> B -> A -> B ...) with hasMore=true is detected
+// and aborted instead of looping forever. The adjacent-cursor guard alone
+// would not catch this.
+func TestPostService_ListAll_TwoCursorCycle(t *testing.T) {
+	var calls int
+	svc := NewPostService(newTestClient(func(r *http.Request) (*http.Response, error) {
+		calls++
+		next := "B"
+		if calls%2 == 0 {
+			next = "A"
+		}
+		return jsonResponse(t, http.StatusOK, models.PostListResponse{
+			Posts:      []models.Post{{ID: "p"}},
+			NextCursor: next,
+			HasMore:    true,
+		}), nil
+	}))
+
+	_, err := svc.ListAll(models.ListPostsParams{})
+	if err == nil {
+		t.Fatal("expected error for two-cursor cycle")
+	}
+	// Calls: 1 -> next=B (seen), 2 -> next=A (seen), 3 -> next=B (repeat).
+	if calls != 3 {
+		t.Errorf("expected 3 calls before detecting cycle, got %d", calls)
+	}
+}
+
 func TestPostService_Delete(t *testing.T) {
 	var method string
 	svc := NewPostService(newTestClient(func(r *http.Request) (*http.Response, error) {

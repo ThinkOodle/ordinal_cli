@@ -116,13 +116,21 @@ func SaveAPIKey(apiKey string) error {
 	}
 
 	cfg := &Config{}
-	if data, err := os.ReadFile(configFile); err == nil {
-		yaml.Unmarshal(data, cfg)
+	data, err := os.ReadFile(configFile)
+	switch {
+	case err == nil:
+		if err := yaml.Unmarshal(data, cfg); err != nil {
+			// Refuse to overwrite a file we can't parse — otherwise the
+			// caller's other settings get silently wiped on save.
+			return fmt.Errorf("parsing existing config at %s (fix or remove the file before saving): %w", configFile, err)
+		}
+	case !os.IsNotExist(err):
+		return fmt.Errorf("reading existing config: %w", err)
 	}
 
 	cfg.APIKey = apiKey
 
-	data, err := yaml.Marshal(cfg)
+	data, err = yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("marshaling config: %w", err)
 	}

@@ -73,6 +73,33 @@ func TestIdeaService_ListAll_RepeatedCursor(t *testing.T) {
 	}
 }
 
+// TestIdeaService_ListAll_TwoCursorCycle locks in that a server alternating
+// between two cursors (A -> B -> A -> B ...) with hasMore=true is detected
+// and aborted instead of looping forever.
+func TestIdeaService_ListAll_TwoCursorCycle(t *testing.T) {
+	var calls int
+	svc := NewIdeaService(newTestClient(func(r *http.Request) (*http.Response, error) {
+		calls++
+		next := "B"
+		if calls%2 == 0 {
+			next = "A"
+		}
+		return jsonResponse(t, http.StatusOK, models.IdeaListResponse{
+			Ideas:      []models.Idea{{ID: "i"}},
+			NextCursor: next,
+			HasMore:    true,
+		}), nil
+	}))
+
+	_, err := svc.ListAll(models.ListIdeasParams{})
+	if err == nil {
+		t.Fatal("expected error for two-cursor cycle")
+	}
+	if calls != 3 {
+		t.Errorf("expected 3 calls before detecting cycle, got %d", calls)
+	}
+}
+
 func TestIdeaService_AddToCalendar(t *testing.T) {
 	svc := NewIdeaService(newTestClient(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Path != "/ideas/abc/add-to-calendar" {
