@@ -35,7 +35,7 @@ func init() {
 	analyticsCpmUpdateCmd.Flags().Float64Var(&analyticsCpmInstagram, "instagram", 0, "Instagram CPM value")
 	analyticsCpmUpdateCmd.Flags().Float64Var(&analyticsCpmFacebook, "facebook", 0, "Facebook CPM value")
 	analyticsCpmUpdateCmd.Flags().Float64Var(&analyticsCpmThreads, "threads", 0, "Threads CPM value")
-	analyticsCpmUpdateCmd.Flags().StringVar(&analyticsCpmUpdateBodyJSON, "body-json", "", "Full JSON body (overrides individual flags)")
+	analyticsCpmUpdateCmd.Flags().StringVar(&analyticsCpmUpdateBodyJSON, "body-json", "", "Full JSON body (individual flags override matching keys when set)")
 	analyticsCpmUpdateCmd.Flags().StringVar(&analyticsCpmUpdateBodyFile, "body-file", "", "Path to JSON body file (or - for stdin)")
 
 	for _, c := range []*cobra.Command{analyticsLinkedInFollowersCmd, analyticsLinkedInPostsCmd, analyticsXFollowersCmd, analyticsXPostsCmd} {
@@ -77,38 +77,43 @@ var analyticsCpmUpdateCmd = &cobra.Command{
 		}
 
 		req := models.CpmUpdateRequest{}
-		if body != nil {
-			if v, ok := body["linkedIn"].(float64); ok {
-				req.LinkedIn = &v
-			}
-			if v, ok := body["x"].(float64); ok {
-				req.X = &v
-			}
-			if v, ok := body["instagram"].(float64); ok {
-				req.Instagram = &v
-			}
-			if v, ok := body["facebook"].(float64); ok {
-				req.Facebook = &v
-			}
-			if v, ok := body["threads"].(float64); ok {
-				req.Threads = &v
-			}
-		} else {
-			if cmd.Flags().Changed("linkedin") {
-				req.LinkedIn = &analyticsCpmLinkedIn
-			}
-			if cmd.Flags().Changed("x") {
-				req.X = &analyticsCpmX
-			}
-			if cmd.Flags().Changed("instagram") {
-				req.Instagram = &analyticsCpmInstagram
-			}
-			if cmd.Flags().Changed("facebook") {
-				req.Facebook = &analyticsCpmFacebook
-			}
-			if cmd.Flags().Changed("threads") {
-				req.Threads = &analyticsCpmThreads
-			}
+		if v, ok := body["linkedIn"].(float64); ok {
+			req.LinkedIn = &v
+		}
+		if v, ok := body["x"].(float64); ok {
+			req.X = &v
+		}
+		if v, ok := body["instagram"].(float64); ok {
+			req.Instagram = &v
+		}
+		if v, ok := body["facebook"].(float64); ok {
+			req.Facebook = &v
+		}
+		if v, ok := body["threads"].(float64); ok {
+			req.Threads = &v
+		}
+		// Flags overlay body values so mixed invocations like
+		// `--body-json '{"x":1}' --linkedin 2` set both, matching the
+		// "flags override the body" contract documented on --body-json.
+		if cmd.Flags().Changed("linkedin") {
+			v := analyticsCpmLinkedIn
+			req.LinkedIn = &v
+		}
+		if cmd.Flags().Changed("x") {
+			v := analyticsCpmX
+			req.X = &v
+		}
+		if cmd.Flags().Changed("instagram") {
+			v := analyticsCpmInstagram
+			req.Instagram = &v
+		}
+		if cmd.Flags().Changed("facebook") {
+			v := analyticsCpmFacebook
+			req.Facebook = &v
+		}
+		if cmd.Flags().Changed("threads") {
+			v := analyticsCpmThreads
+			req.Threads = &v
 		}
 
 		if req.LinkedIn == nil && req.X == nil && req.Instagram == nil && req.Facebook == nil && req.Threads == nil {

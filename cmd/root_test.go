@@ -226,25 +226,71 @@ func TestBodyJSONFlagPrecedence_CreatePattern(t *testing.T) {
 }
 
 // TestPrintRawJSON_EmptyBodyIsSuccess locks in that a 204-style zero-length
-// response is treated as a structured success rather than a parse error.
-// Any mutation endpoint that legitimately returns no body (common for DELETE
-// and some idempotent POSTs) routes through printRawJSON, so one case here
-// guards the whole set from regressing to "unexpected end of JSON input".
+// response — or a 200 "{}" response — is treated as a structured success
+// rather than a parse error or a bare map that extractRows cannot render.
+// Any mutation endpoint that legitimately returns no body content (common
+// for DELETE and some idempotent POSTs) routes through printRawJSON, so one
+// case per format here guards the whole set from regressing to "unexpected
+// end of JSON input" (empty body) or "unsupported data type" (empty object
+// under --output table/csv).
 func TestPrintRawJSON_EmptyBodyIsSuccess(t *testing.T) {
 	// printRawJSON is called directly without going through Execute, so
 	// appConfig isn't re-populated by PersistentPreRunE. Bypass state bled
 	// in from earlier tests on this shared rootCmd.
 	prev := appConfig
 	t.Cleanup(func() { appConfig = prev })
-	appConfig = &config.Config{OutputFormat: config.DefaultOutputFormat}
 
-	cases := [][]byte{nil, {}, []byte("   "), []byte("\n\t")}
-	for _, data := range cases {
-		t.Run(string(data), func(t *testing.T) {
-			if err := printRawJSON(data); err != nil {
-				t.Errorf("empty body should succeed, got: %v", err)
-			}
-		})
+	bodies := map[string][]byte{
+		"nil":        nil,
+		"empty":      {},
+		"spaces":     []byte("   "),
+		"whitespace": []byte("\n\t"),
+		"empty_obj":  []byte("{}"),
+	}
+	formats := []string{"json", "table", "csv"}
+	for name, data := range bodies {
+		for _, format := range formats {
+			t.Run(name+"/"+format, func(t *testing.T) {
+				appConfig = &config.Config{OutputFormat: format}
+				if err := printRawJSON(data); err != nil {
+					t.Errorf("empty body should succeed, got: %v", err)
+				}
+			})
+		}
+	}
+}
+
+// TestPrintResult_EmptyCSVHasNoBlankLine guards the "stdout stays strictly
+// parseable" contract for CSV output when the result set is empty. A lone
+// trailing newline was being emitted because fmt.Println always ran, even
+// when the formatter returned an empty body; a downstream csv.Reader would
+// then see a single empty record and misreport row counts.
+func TestPrintResult_EmptyCSVHasNoBlankLine(t *testing.T) {
+	prev := appConfig
+	t.Cleanup(func() { appConfig = prev })
+	appConfig = &config.Config{OutputFormat: "csv"}
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	if err := printResult([]map[string]interface{}{}); err != nil {
+		t.Fatalf("printResult: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("expected empty stdout for empty csv; got %q", buf.String())
 	}
 }
 

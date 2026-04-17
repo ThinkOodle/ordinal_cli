@@ -68,7 +68,10 @@ var uploadGetCmd = &cobra.Command{
 // A zero-length (or whitespace-only) body — what the API returns for 204
 // No Content — is treated as a successful acknowledgement rather than a
 // parse error, so delete/update endpoints that intentionally return no body
-// still exit 0 with a machine-readable confirmation.
+// still exit 0 with a machine-readable confirmation. An empty JSON object
+// ({}) gets the same treatment: extractRows has no columns to render from
+// a zero-field map, so --output table/csv would otherwise fail on a
+// successful mutation that simply returns no body fields.
 func printRawJSON(data []byte) error {
 	if len(bytes.TrimSpace(data)) == 0 {
 		return printResult(map[string]interface{}{"success": true})
@@ -76,6 +79,9 @@ func printRawJSON(data []byte) error {
 	var v interface{}
 	if err := json.Unmarshal(data, &v); err != nil {
 		return fmt.Errorf("parsing response: %w", err)
+	}
+	if m, ok := v.(map[string]interface{}); ok && len(m) == 0 {
+		return printResult(map[string]interface{}{"success": true})
 	}
 	return printResult(v)
 }

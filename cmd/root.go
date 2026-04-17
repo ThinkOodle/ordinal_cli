@@ -168,7 +168,14 @@ func printResult(data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("formatting output: %w", err)
 	}
-	fmt.Println(out)
+	// An empty CSV body (no rows, no headers) must not produce a lone blank
+	// newline on stdout — downstream csv readers would interpret that as an
+	// empty record, breaking the "stdout stays strictly parseable" contract.
+	// Other formats have a visible sentinel ("{}", "No results") and still
+	// get the newline.
+	if !(format == output.FormatCSV && out == "") {
+		fmt.Println(out)
+	}
 	if footer != "" {
 		if format == output.FormatCSV {
 			fmt.Fprintln(os.Stderr, footer)
