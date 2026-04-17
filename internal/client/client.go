@@ -162,6 +162,29 @@ func (c *Client) doJSON(method, path string, body interface{}) ([]byte, error) {
 	return c.do(req)
 }
 
+// parseRetryAfter parses a Retry-After header value in either of the two
+// forms RFC 7231 permits: delay-seconds (non-negative integer) or an
+// HTTP-date. Proxies and CDNs commonly emit the HTTP-date form, so ignoring
+// it would force the client to fall back to its own backoff and retry sooner
+// than the server asked.
+//
+// Past or malformed dates return ok=false so the caller keeps its existing
+// backoff rather than racing forward with a zero wait.
+func parseRetryAfter(v string, now time.Time) (time.Duration, bool) {
+	if seconds, err := strconv.Atoi(v); err == nil {
+		if seconds < 0 {
+			return 0, false
+		}
+		return time.Duration(seconds) * time.Second, true
+	}
+	if t, err := http.ParseTime(v); err == nil {
+		if d := t.Sub(now); d > 0 {
+			return d, true
+		}
+	}
+	return 0, false
+}
+
 // isIdempotent reports whether a request method is safe to retry automatically
 // after a transport-level failure. Non-idempotent methods (POST/PATCH) are not
 // retried on transport errors because the server may have processed the first
@@ -241,8 +264,8 @@ func (c *Client) do(req *http.Request) ([]byte, error) {
 
 		if resp.StatusCode == http.StatusTooManyRequests {
 			if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
-				if seconds, err := strconv.Atoi(retryAfter); err == nil {
-					backoff = time.Duration(seconds) * time.Second
+				if d, ok := parseRetryAfter(retryAfter, time.Now()); ok {
+					backoff = d
 				}
 			}
 			lastErr = &APIError{

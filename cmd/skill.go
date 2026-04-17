@@ -21,9 +21,10 @@ func init() {
 }
 
 var skillCmd = &cobra.Command{
-	Use:   "skill",
-	Short: "Manage bundled AI agent skills",
-	Long:  "Install the bundled Ordinal CLI usage skill for agents that operate the installed `ordinal` binary.",
+	Use:         "skill",
+	Short:       "Manage bundled AI agent skills",
+	Long:        "Install the bundled Ordinal CLI usage skill for agents that operate the installed `ordinal` binary.",
+	Annotations: map[string]string{skipOutputValidationAnnotation: "true"},
 }
 
 var skillInstallCmd = &cobra.Command{

@@ -177,10 +177,6 @@ var postCreateCmd = &cobra.Command{
 	Short: "Create a post",
 	Long:  "Create a post. Use --body-json or --body-file to pass the full request including nested linkedIn/x/instagram channel configs. Individual flags override matching top-level keys in the body when provided.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := newClient()
-		if err != nil {
-			return err
-		}
 		body, err := parseBodyJSON(postCreateBodyJSON, postCreateBodyFile)
 		if err != nil {
 			return err
@@ -205,6 +201,23 @@ var postCreateCmd = &cobra.Command{
 		}
 		if postCreateNotes != "" {
 			body["notes"] = postCreateNotes
+		}
+		// Validate required fields before authenticating / dialing the API.
+		// The Ordinal API rejects posts missing any of these, and surfacing
+		// the error locally gives a more actionable message without
+		// consuming a rate-limit slot.
+		for _, field := range []struct{ key, flag string }{
+			{"title", "title"},
+			{"publishAt", "publish-at"},
+			{"status", "status"},
+		} {
+			if v, ok := body[field.key]; !ok || v == "" {
+				return fmt.Errorf("--%s or a %q field in --body-json/--body-file is required", field.flag, field.key)
+			}
+		}
+		c, err := newClient()
+		if err != nil {
+			return err
 		}
 		data, err := api.NewPostService(c).Create(body)
 		if err != nil {

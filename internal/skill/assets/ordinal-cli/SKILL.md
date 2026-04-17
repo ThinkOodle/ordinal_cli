@@ -92,7 +92,6 @@ Common global flags:
 
 - `--api-key`, `-k`
 - `--output`, `-o`: `json`, `table`, `csv`
-- `--no-color`
 - `--verbose`, `-v`
 
 Default operating posture:

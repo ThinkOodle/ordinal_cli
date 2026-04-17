@@ -95,7 +95,6 @@ By default, the installer writes `SKILL.md` into:
 |------|-------|-------------|
 | `--api-key` | `-k` | API key (also via `ORDINAL_API_KEY` env var) |
 | `--output` | `-o` | Output format: `json`, `table`, `csv` |
-| `--no-color` | | Disable colored output |
 | `--verbose` | `-v` | Show request/response details |
 
 ### Pagination Flags

@@ -54,7 +54,6 @@ func TestLoad_BrokenConfigPreservesEnvAPIKey(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("ORDINAL_API_KEY", "env-key")
 	t.Setenv("ORDINAL_OUTPUT_FORMAT", "")
-	t.Setenv("ORDINAL_NO_COLOR", "")
 	t.Setenv("ORDINAL_VERBOSE", "")
 
 	dir := filepath.Join(home, ".config", configDirName)

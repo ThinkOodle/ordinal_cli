@@ -32,7 +32,6 @@ const (
 type Config struct {
 	APIKey       string `mapstructure:"api_key" yaml:"api_key,omitempty"`
 	OutputFormat string `mapstructure:"output_format" yaml:"output_format,omitempty"`
-	NoColor      bool   `mapstructure:"no_color" yaml:"no_color,omitempty"`
 	Verbose      bool   `mapstructure:"verbose" yaml:"verbose,omitempty"`
 }
 
@@ -65,7 +64,6 @@ func Load() (*Config, error) {
 	v := viper.New()
 
 	v.SetDefault("output_format", DefaultOutputFormat)
-	v.SetDefault("no_color", false)
 	v.SetDefault("verbose", false)
 
 	v.SetEnvPrefix(EnvPrefix)
@@ -73,7 +71,6 @@ func Load() (*Config, error) {
 
 	v.BindEnv("api_key", "ORDINAL_API_KEY")
 	v.BindEnv("output_format", "ORDINAL_OUTPUT_FORMAT")
-	v.BindEnv("no_color", "ORDINAL_NO_COLOR")
 	v.BindEnv("verbose", "ORDINAL_VERBOSE")
 
 	var readErr error

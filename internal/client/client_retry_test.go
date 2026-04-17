@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -143,6 +144,37 @@ func TestClient_RetriesPOSTOn429(t *testing.T) {
 	}
 	if len(bodies) != 2 || bodies[0] != bodies[1] {
 		t.Errorf("expected identical POST bodies on retry, got %v", bodies)
+	}
+}
+
+func TestParseRetryAfter(t *testing.T) {
+	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name   string
+		header string
+		want   time.Duration
+		ok     bool
+	}{
+		{"seconds", "5", 5 * time.Second, true},
+		{"zero seconds", "0", 0, true},
+		{"negative seconds ignored", "-3", 0, false},
+		{"http-date future", now.Add(10 * time.Second).UTC().Format(http.TimeFormat), 10 * time.Second, true},
+		{"http-date past ignored", now.Add(-1 * time.Second).UTC().Format(http.TimeFormat), 0, false},
+		{"garbage ignored", "soon", 0, false},
+		{"empty ignored", "", 0, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := parseRetryAfter(tc.header, now)
+			if ok != tc.ok {
+				t.Fatalf("ok: got %v, want %v", ok, tc.ok)
+			}
+			if ok && got != tc.want {
+				t.Errorf("duration: got %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
 

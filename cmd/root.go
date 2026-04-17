@@ -16,10 +16,33 @@ import (
 var (
 	cfgAPIKey       string
 	cfgOutputFormat string
-	cfgNoColor      bool
 	cfgVerbose      bool
 	appConfig       *config.Config
 )
+
+// skipOutputValidationAnnotation marks commands (or command groups) that do
+// not render API output and therefore should not fail when the saved
+// output_format is invalid. Without this, a bad config value would brick the
+// very commands meant to repair config state (`auth`) or perform local
+// utility work (`skill`, shell completion).
+const skipOutputValidationAnnotation = "ordinal/skipOutputValidation"
+
+// skipsOutputValidation reports whether cmd or any of its ancestors carry the
+// skip-output-validation annotation. Walking the parent chain lets the
+// annotation apply to an entire subtree (e.g. `skill` covers `skill install`).
+func skipsOutputValidation(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		if c.Annotations[skipOutputValidationAnnotation] == "true" {
+			return true
+		}
+		// Cobra auto-generates the `completion` command; we can't set
+		// annotations on it from here, so match by name.
+		if c.Name() == "completion" {
+			return true
+		}
+	}
+	return false
+}
 
 // rootCmd is the base command for the CLI.
 var rootCmd = &cobra.Command{
@@ -43,15 +66,15 @@ var rootCmd = &cobra.Command{
 		if cmd.Flags().Changed("output") {
 			appConfig.OutputFormat = cfgOutputFormat
 		}
-		if cmd.Flags().Changed("no-color") {
-			appConfig.NoColor = cfgNoColor
-		}
 		if cmd.Flags().Changed("verbose") {
 			appConfig.Verbose = cfgVerbose
 		}
 
 		if appConfig.OutputFormat == "" {
 			appConfig.OutputFormat = config.DefaultOutputFormat
+		}
+		if skipsOutputValidation(cmd) {
+			return nil
 		}
 		if !output.IsValidFormat(output.Format(appConfig.OutputFormat)) {
 			return fmt.Errorf("invalid output format %q: must be one of json, table, csv", appConfig.OutputFormat)
@@ -64,7 +87,6 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgAPIKey, "api-key", "k", "", "API key (env: ORDINAL_API_KEY)")
 	rootCmd.PersistentFlags().StringVarP(&cfgOutputFormat, "output", "o", "", "Output format: json, table, csv (default: json)")
-	rootCmd.PersistentFlags().BoolVar(&cfgNoColor, "no-color", false, "Disable colored output")
 	rootCmd.PersistentFlags().BoolVarP(&cfgVerbose, "verbose", "v", false, "Verbose output (shows request/response details)")
 }
 

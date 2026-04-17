@@ -12,10 +12,11 @@ func init() {
 }
 
 var authCmd = &cobra.Command{
-	Use:   "auth <api-key>",
-	Short: "Set the API key for authentication",
-	Long:  "Save your Ordinal API key to ~/.config/ordinal/config.yaml for use in subsequent commands.",
-	Args:  cobra.ExactArgs(1),
+	Use:         "auth <api-key>",
+	Short:       "Set the API key for authentication",
+	Long:        "Save your Ordinal API key to ~/.config/ordinal/config.yaml for use in subsequent commands.",
+	Args:        cobra.ExactArgs(1),
+	Annotations: map[string]string{skipOutputValidationAnnotation: "true"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		apiKey := args[0]
 

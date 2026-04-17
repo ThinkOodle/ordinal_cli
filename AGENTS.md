@@ -139,7 +139,6 @@ Post-scoped resources (comments, approvals, engagements, subscribers, inline-com
 
 - `--api-key` / `-k` — API key (also via `ORDINAL_API_KEY` or saved config)
 - `--output` / `-o` — Output format: `json`, `table`, `csv`
-- `--no-color` — Disable colored output
 - `--verbose` / `-v` — Verbose output (shows request/response details)
 
 ### Pagination Flags
