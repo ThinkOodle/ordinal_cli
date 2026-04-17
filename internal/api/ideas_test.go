@@ -100,6 +100,31 @@ func TestIdeaService_ListAll_TwoCursorCycle(t *testing.T) {
 	}
 }
 
+// TestIdeaService_Get uses the documented {"idea": ...} envelope shape
+// (see https://docs.tryordinal.com/api/openapi.json, GET /ideas/{id}) so
+// the test fails if the service ever regresses to unwrapped decoding.
+func TestIdeaService_Get(t *testing.T) {
+	svc := NewIdeaService(newTestClient(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path != "/ideas/abc" {
+			t.Errorf("expected /ideas/abc, got %s", r.URL.Path)
+		}
+		return jsonResponse(t, http.StatusOK, map[string]interface{}{
+			"idea": models.Idea{ID: "abc", Title: "hello"},
+		}), nil
+	}))
+
+	i, err := svc.Get("abc")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if i.ID != "abc" {
+		t.Errorf("expected id abc, got %s", i.ID)
+	}
+	if i.Title != "hello" {
+		t.Errorf("expected hello, got %s", i.Title)
+	}
+}
+
 func TestIdeaService_AddToCalendar(t *testing.T) {
 	svc := NewIdeaService(newTestClient(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Path != "/ideas/abc/add-to-calendar" {

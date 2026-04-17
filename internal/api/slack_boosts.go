@@ -35,6 +35,13 @@ func (s *SlackBoostService) ListByPost(postID string) (*models.SlackBoostListRes
 	return &resp, nil
 }
 
+// slackBoostEnvelope matches the {"slackBoost": ...} wrapper the API
+// returns on get, create, and update. Unwrapping it here keeps callers
+// from silently receiving a zero-valued SlackBoost on success.
+type slackBoostEnvelope struct {
+	SlackBoost models.SlackBoost `json:"slackBoost"`
+}
+
 // Get returns a Slack boost by ID.
 func (s *SlackBoostService) Get(id string) (*models.SlackBoost, error) {
 	data, err := s.client.Get(slackBoostsBasePath+"/"+id, nil)
@@ -42,11 +49,11 @@ func (s *SlackBoostService) Get(id string) (*models.SlackBoost, error) {
 		return nil, fmt.Errorf("getting slack boost: %w", err)
 	}
 
-	var b models.SlackBoost
-	if err := json.Unmarshal(data, &b); err != nil {
+	var env slackBoostEnvelope
+	if err := json.Unmarshal(data, &env); err != nil {
 		return nil, fmt.Errorf("parsing slack boost: %w", err)
 	}
-	return &b, nil
+	return &env.SlackBoost, nil
 }
 
 // Create creates a Slack boost.
@@ -56,11 +63,11 @@ func (s *SlackBoostService) Create(req models.CreateSlackBoostRequest) (*models.
 		return nil, fmt.Errorf("creating slack boost: %w", err)
 	}
 
-	var b models.SlackBoost
-	if err := json.Unmarshal(data, &b); err != nil {
+	var env slackBoostEnvelope
+	if err := json.Unmarshal(data, &env); err != nil {
 		return nil, fmt.Errorf("parsing created slack boost: %w", err)
 	}
-	return &b, nil
+	return &env.SlackBoost, nil
 }
 
 // Update updates a Slack boost.
@@ -70,11 +77,11 @@ func (s *SlackBoostService) Update(id string, req models.UpdateSlackBoostRequest
 		return nil, fmt.Errorf("updating slack boost: %w", err)
 	}
 
-	var b models.SlackBoost
-	if err := json.Unmarshal(data, &b); err != nil {
+	var env slackBoostEnvelope
+	if err := json.Unmarshal(data, &env); err != nil {
 		return nil, fmt.Errorf("parsing updated slack boost: %w", err)
 	}
-	return &b, nil
+	return &env.SlackBoost, nil
 }
 
 // Delete deletes a Slack boost by ID.

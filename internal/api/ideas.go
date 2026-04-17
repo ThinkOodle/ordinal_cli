@@ -103,18 +103,21 @@ func (s *IdeaService) ListAll(params models.ListIdeasParams) ([]models.Idea, err
 	return all, nil
 }
 
-// Get returns a single idea by ID.
+// Get returns a single idea by ID. The API wraps the idea in an
+// {"idea": ...} envelope; unwrap it so callers receive the idea itself.
 func (s *IdeaService) Get(id string) (*models.Idea, error) {
 	data, err := s.client.Get(ideasBasePath+"/"+id, nil)
 	if err != nil {
 		return nil, fmt.Errorf("getting idea: %w", err)
 	}
 
-	var i models.Idea
-	if err := json.Unmarshal(data, &i); err != nil {
+	var wrapper struct {
+		Idea models.Idea `json:"idea"`
+	}
+	if err := json.Unmarshal(data, &wrapper); err != nil {
 		return nil, fmt.Errorf("parsing idea: %w", err)
 	}
-	return &i, nil
+	return &wrapper.Idea, nil
 }
 
 // Create creates a new idea.

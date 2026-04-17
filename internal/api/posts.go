@@ -115,18 +115,21 @@ func (s *PostService) ListAll(params models.ListPostsParams) ([]models.Post, err
 	return all, nil
 }
 
-// Get returns a single post by ID.
+// Get returns a single post by ID. The API wraps the post in a
+// {"post": ...} envelope; unwrap it so callers receive the post itself.
 func (s *PostService) Get(id string) (*models.Post, error) {
 	data, err := s.client.Get(postsBasePath+"/"+id, nil)
 	if err != nil {
 		return nil, fmt.Errorf("getting post: %w", err)
 	}
 
-	var p models.Post
-	if err := json.Unmarshal(data, &p); err != nil {
+	var wrapper struct {
+		Post models.Post `json:"post"`
+	}
+	if err := json.Unmarshal(data, &wrapper); err != nil {
 		return nil, fmt.Errorf("parsing post: %w", err)
 	}
-	return &p, nil
+	return &wrapper.Post, nil
 }
 
 // Create creates a new post. Body is a map to accommodate the complex nested

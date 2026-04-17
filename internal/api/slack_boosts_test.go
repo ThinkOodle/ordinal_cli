@@ -27,6 +27,11 @@ func TestSlackBoostService_ListByPost(t *testing.T) {
 	}
 }
 
+// TestSlackBoostService_CreateGetUpdateDelete uses the documented
+// {"slackBoost": ...} envelope shape for create, get, and update
+// (see https://docs.tryordinal.com/api-reference/slack-boosts/update-slack-boost
+// and the matching create/get operations in the OpenAPI spec) so the test
+// fails if any of those services regresses to unwrapped decoding.
 func TestSlackBoostService_CreateGetUpdateDelete(t *testing.T) {
 	svc := NewSlackBoostService(newTestClient(func(r *http.Request) (*http.Response, error) {
 		switch {
@@ -35,11 +40,17 @@ func TestSlackBoostService_CreateGetUpdateDelete(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Fatalf("decoding: %v", err)
 			}
-			return jsonResponse(t, http.StatusOK, models.SlackBoost{ID: "sb1", PostID: body.PostID}), nil
+			return jsonResponse(t, http.StatusOK, map[string]interface{}{
+				"slackBoost": models.SlackBoost{ID: "sb1", PostID: body.PostID},
+			}), nil
 		case r.Method == http.MethodGet && r.URL.Path == "/slack-boosts/sb1":
-			return jsonResponse(t, http.StatusOK, models.SlackBoost{ID: "sb1"}), nil
+			return jsonResponse(t, http.StatusOK, map[string]interface{}{
+				"slackBoost": models.SlackBoost{ID: "sb1"},
+			}), nil
 		case r.Method == http.MethodPatch && r.URL.Path == "/slack-boosts/sb1":
-			return jsonResponse(t, http.StatusOK, models.SlackBoost{ID: "sb1", Copy: "updated"}), nil
+			return jsonResponse(t, http.StatusOK, map[string]interface{}{
+				"slackBoost": models.SlackBoost{ID: "sb1", Copy: "updated"},
+			}), nil
 		case r.Method == http.MethodDelete && r.URL.Path == "/slack-boosts/sb1":
 			return jsonResponse(t, http.StatusOK, map[string]bool{"success": true}), nil
 		}
@@ -47,14 +58,26 @@ func TestSlackBoostService_CreateGetUpdateDelete(t *testing.T) {
 		return jsonResponse(t, http.StatusBadRequest, nil), nil
 	}))
 
-	if _, err := svc.Create(models.CreateSlackBoostRequest{PostID: "p1", SlackWebhookID: "sw1"}); err != nil {
+	created, err := svc.Create(models.CreateSlackBoostRequest{PostID: "p1", SlackWebhookID: "sw1"})
+	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	if _, err := svc.Get("sb1"); err != nil {
+	if created.ID != "sb1" || created.PostID != "p1" {
+		t.Errorf("unexpected created boost: %+v", created)
+	}
+	got, err := svc.Get("sb1")
+	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if _, err := svc.Update("sb1", map[string]interface{}{"copy": "updated"}); err != nil {
+	if got.ID != "sb1" {
+		t.Errorf("unexpected get boost: %+v", got)
+	}
+	updated, err := svc.Update("sb1", map[string]interface{}{"copy": "updated"})
+	if err != nil {
 		t.Fatalf("update: %v", err)
+	}
+	if updated.ID != "sb1" || updated.Copy != "updated" {
+		t.Errorf("unexpected updated boost: %+v", updated)
 	}
 	if err := svc.Delete("sb1"); err != nil {
 		t.Fatalf("delete: %v", err)

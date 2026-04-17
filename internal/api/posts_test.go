@@ -38,17 +38,25 @@ func TestPostService_List(t *testing.T) {
 	}
 }
 
+// TestPostService_Get uses the documented {"post": ...} envelope shape
+// (see https://docs.tryordinal.com/api/openapi.json, GET /posts/{id}) so
+// the test fails if the service ever regresses to unwrapped decoding.
 func TestPostService_Get(t *testing.T) {
 	svc := NewPostService(newTestClient(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Path != "/posts/abc" {
 			t.Errorf("expected /posts/abc, got %s", r.URL.Path)
 		}
-		return jsonResponse(t, http.StatusOK, models.Post{ID: "abc", Title: "hello", Status: "ToDo"}), nil
+		return jsonResponse(t, http.StatusOK, map[string]interface{}{
+			"post": models.Post{ID: "abc", Title: "hello", Status: "ToDo"},
+		}), nil
 	}))
 
 	p, err := svc.Get("abc")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if p.ID != "abc" {
+		t.Errorf("expected id abc, got %s", p.ID)
 	}
 	if p.Title != "hello" {
 		t.Errorf("expected hello, got %s", p.Title)
