@@ -81,11 +81,12 @@ func TestLoad_BrokenConfigPreservesEnvAPIKey(t *testing.T) {
 	}
 }
 
-// TestSaveAPIKey_RefusesToClobberMalformedConfig locks in that SaveAPIKey
-// refuses to overwrite an existing config file it can't parse, so that a
-// broken YAML file doesn't cause other settings (e.g. output_format) to be
-// silently wiped when the user runs `ordinal auth`.
-func TestSaveAPIKey_RefusesToClobberMalformedConfig(t *testing.T) {
+// TestSaveAPIKey_RecoversFromMalformedConfig locks in the recovery path the
+// root command's PersistentPreRunE promises: if the saved config file can't
+// be parsed, `ordinal auth` must still succeed so the user isn't stranded.
+// The unparseable bytes are preserved in a timestamped backup so any other
+// settings the user cared about remain recoverable by hand.
+func TestSaveAPIKey_RecoversFromMalformedConfig(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -99,16 +100,40 @@ func TestSaveAPIKey_RefusesToClobberMalformedConfig(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	if err := SaveAPIKey("new-key"); err == nil {
-		t.Fatal("expected error when existing config is malformed")
+	if err := SaveAPIKey("new-key"); err != nil {
+		t.Fatalf("expected recovery to succeed, got: %v", err)
 	}
 
-	got, err := os.ReadFile(path)
+	cfg, err := Load()
 	if err != nil {
-		t.Fatalf("reread: %v", err)
+		t.Fatalf("post-recovery Load: %v", err)
 	}
-	if string(got) != string(original) {
-		t.Errorf("existing config should be preserved on parse failure; got:\n%s", got)
+	if cfg.APIKey != "new-key" {
+		t.Errorf("expected api key new-key, got %q", cfg.APIKey)
+	}
+
+	// The unparseable original must survive somewhere so the user can
+	// hand-recover settings they may have cared about (e.g. output_format).
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("readdir: %v", err)
+	}
+	var backup []byte
+	for _, e := range entries {
+		if e.Name() == filepath.Base(path) {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			t.Fatalf("read backup %s: %v", e.Name(), err)
+		}
+		if string(data) == string(original) {
+			backup = data
+			break
+		}
+	}
+	if backup == nil {
+		t.Errorf("expected a backup of the original unparseable config in %s, found entries: %v", dir, entries)
 	}
 }
 

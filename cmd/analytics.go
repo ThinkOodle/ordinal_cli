@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
@@ -132,24 +131,10 @@ func analyticsDateRange() models.AnalyticsDateRange {
 	return models.AnalyticsDateRange{StartDate: analyticsStartDate, EndDate: analyticsEndDate}
 }
 
-// requireProfileID validates the shared analytics --profile-id flag before the
-// per-platform commands hit the network. Cobra's MarkFlagRequired accepts ""
-// and "   ", which would otherwise produce a 404 from the API instead of a
-// local, actionable error.
-func requireProfileID() error {
-	if strings.TrimSpace(analyticsProfileID) == "" {
-		return fmt.Errorf("--profile-id must not be empty")
-	}
-	return nil
-}
-
 var analyticsLinkedInFollowersCmd = &cobra.Command{
 	Use:   "linkedin-followers",
 	Short: "LinkedIn follower growth for a profile",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := requireProfileID(); err != nil {
-			return err
-		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -166,9 +151,6 @@ var analyticsLinkedInPostsCmd = &cobra.Command{
 	Use:   "linkedin-posts",
 	Short: "LinkedIn post analytics for a profile",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := requireProfileID(); err != nil {
-			return err
-		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -185,9 +167,6 @@ var analyticsXFollowersCmd = &cobra.Command{
 	Use:   "x-followers",
 	Short: "X (Twitter) follower growth for a profile",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := requireProfileID(); err != nil {
-			return err
-		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -204,9 +183,6 @@ var analyticsXPostsCmd = &cobra.Command{
 	Use:   "x-posts",
 	Short: "X (Twitter) post analytics for a profile",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := requireProfileID(); err != nil {
-			return err
-		}
 		c, err := newClient()
 		if err != nil {
 			return err

@@ -1,9 +1,9 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
@@ -36,9 +36,6 @@ var uploadCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Upload a file from a URL",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if strings.TrimSpace(uploadCreateURL) == "" {
-			return fmt.Errorf("--url must not be empty")
-		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -55,9 +52,6 @@ var uploadGetCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get the status of an upload job",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if strings.TrimSpace(uploadID) == "" {
-			return fmt.Errorf("--id must not be empty")
-		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -71,7 +65,14 @@ var uploadGetCmd = &cobra.Command{
 }
 
 // printRawJSON parses a raw JSON payload and formats it via printResult.
+// A zero-length (or whitespace-only) body — what the API returns for 204
+// No Content — is treated as a successful acknowledgement rather than a
+// parse error, so delete/update endpoints that intentionally return no body
+// still exit 0 with a machine-readable confirmation.
 func printRawJSON(data []byte) error {
+	if len(bytes.TrimSpace(data)) == 0 {
+		return printResult(map[string]interface{}{"success": true})
+	}
 	var v interface{}
 	if err := json.Unmarshal(data, &v); err != nil {
 		return fmt.Errorf("parsing response: %w", err)

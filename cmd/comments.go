@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
 	"github.com/spf13/cobra"
@@ -58,11 +55,6 @@ var commentCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a comment on a post",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// MarkFlagRequired only checks presence; --message "" or whitespace
-		// would otherwise reach the API and fail with a less-actionable error.
-		if strings.TrimSpace(commentMessage) == "" {
-			return fmt.Errorf("--message must not be empty")
-		}
 		c, err := newClient()
 		if err != nil {
 			return err

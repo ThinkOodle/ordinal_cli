@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/viper"
 	"go.yaml.in/yaml/v3"
@@ -120,9 +121,18 @@ func SaveAPIKey(apiKey string) error {
 	switch {
 	case err == nil:
 		if err := yaml.Unmarshal(data, cfg); err != nil {
-			// Refuse to overwrite a file we can't parse — otherwise the
-			// caller's other settings get silently wiped on save.
-			return fmt.Errorf("parsing existing config at %s (fix or remove the file before saving): %w", configFile, err)
+			// Root's PersistentPreRunE promises `auth` can repair a broken
+			// config. Refusing to save would force manual file deletion and
+			// strand a user whose only way to recover is running this very
+			// command. Preserve the unparseable bytes as a timestamped
+			// backup so any other settings the user cared about remain
+			// recoverable, then continue with a fresh config.
+			backup := configFile + ".bak." + time.Now().UTC().Format("20060102T150405Z")
+			if writeErr := os.WriteFile(backup, data, 0600); writeErr != nil {
+				return fmt.Errorf("backing up unparseable config at %s: %w", configFile, writeErr)
+			}
+			fmt.Fprintf(os.Stderr, "warning: existing config at %s was unparseable (%v); backed up to %s\n", configFile, err, backup)
+			cfg = &Config{}
 		}
 	case !os.IsNotExist(err):
 		return fmt.Errorf("reading existing config: %w", err)

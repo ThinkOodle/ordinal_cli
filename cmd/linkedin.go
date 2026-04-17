@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/spf13/cobra"
 )
@@ -34,9 +31,6 @@ var linkedInGetProfileCmd = &cobra.Command{
 	Use:   "get-profile",
 	Short: "Look up a LinkedIn profile by URN",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if strings.TrimSpace(linkedInURN) == "" {
-			return fmt.Errorf("--urn must not be empty")
-		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -53,9 +47,6 @@ var linkedInGetMentionCmd = &cobra.Command{
 	Use:   "get-mention",
 	Short: "Get the mention format for a LinkedIn username",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if strings.TrimSpace(linkedInUsername) == "" {
-			return fmt.Errorf("--username must not be empty")
-		}
 		c, err := newClient()
 		if err != nil {
 			return err

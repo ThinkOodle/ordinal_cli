@@ -82,6 +82,55 @@ func TestRoot_AuthBypassesOutputFormatValidation(t *testing.T) {
 	}
 }
 
+// TestRoot_RejectsEmptyRequiredStringFlags locks in that every required string
+// flag across the CLI is rejected when passed as "" or whitespace. The shared
+// PersistentPreRunE validator replaces per-command TrimSpace checks, so one
+// case per representative command here guards the whole set from regressing.
+func TestRoot_RejectsEmptyRequiredStringFlags(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ORDINAL_API_KEY", "test-key")
+	t.Setenv("ORDINAL_OUTPUT_FORMAT", "")
+	t.Setenv("ORDINAL_VERBOSE", "")
+	// Clear any --output value bled in from a previous test on this
+	// shared rootCmd so PersistentPreRunE falls through to the default.
+	cfgOutputFormat = ""
+
+	tests := []struct {
+		name     string
+		args     []string
+		wantFlag string
+	}{
+		{"comment list --post-id ''", []string{"comment", "list", "--post-id", ""}, "post-id"},
+		{"comment list --post-id whitespace", []string{"comment", "list", "--post-id", "   "}, "post-id"},
+		{"comment delete --id ''", []string{"comment", "delete", "--id", ""}, "id"},
+		{"subscriber list --post-id ''", []string{"subscriber", "list", "--post-id", ""}, "post-id"},
+		{"slack-boost list --post-id ''", []string{"slack-boost", "list", "--post-id", ""}, "post-id"},
+		{"webhook get --id ''", []string{"webhook", "get", "--id", ""}, "id"},
+		{"post get --id ''", []string{"post", "get", "--id", ""}, "id"},
+		{"analytics linkedin-followers --profile-id ''", []string{"analytics", "linkedin-followers", "--profile-id", ""}, "profile-id"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			rootCmd.SetOut(&buf)
+			rootCmd.SetErr(&buf)
+			rootCmd.SetArgs(tc.args)
+
+			err := rootCmd.Execute()
+			if err == nil {
+				t.Fatalf("expected error for empty required flag")
+			}
+			if !strings.Contains(err.Error(), tc.wantFlag) {
+				t.Errorf("expected error about %q, got: %v", tc.wantFlag, err)
+			}
+			if !strings.Contains(err.Error(), "must not be empty") {
+				t.Errorf("expected 'must not be empty' message, got: %v", err)
+			}
+		})
+	}
+}
+
 // TestBodyJSONFlagPrecedence_UpdatePattern locks in the precedence rule that
 // the help text for --body-json on the *update commands* promises: the body
 // is parsed first, then individual flags override matching top-level keys
@@ -173,6 +222,29 @@ func TestBodyJSONFlagPrecedence_CreatePattern(t *testing.T) {
 	}
 	if merged["extra"] != "keep" {
 		t.Errorf("non-matching body key must survive: got %v", merged["extra"])
+	}
+}
+
+// TestPrintRawJSON_EmptyBodyIsSuccess locks in that a 204-style zero-length
+// response is treated as a structured success rather than a parse error.
+// Any mutation endpoint that legitimately returns no body (common for DELETE
+// and some idempotent POSTs) routes through printRawJSON, so one case here
+// guards the whole set from regressing to "unexpected end of JSON input".
+func TestPrintRawJSON_EmptyBodyIsSuccess(t *testing.T) {
+	// printRawJSON is called directly without going through Execute, so
+	// appConfig isn't re-populated by PersistentPreRunE. Bypass state bled
+	// in from earlier tests on this shared rootCmd.
+	prev := appConfig
+	t.Cleanup(func() { appConfig = prev })
+	appConfig = &config.Config{OutputFormat: config.DefaultOutputFormat}
+
+	cases := [][]byte{nil, {}, []byte("   "), []byte("\n\t")}
+	for _, data := range cases {
+		t.Run(string(data), func(t *testing.T) {
+			if err := printRawJSON(data); err != nil {
+				t.Errorf("empty body should succeed, got: %v", err)
+			}
+		})
 	}
 }
 

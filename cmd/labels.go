@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
 	"github.com/spf13/cobra"
@@ -56,14 +53,6 @@ var labelCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a label",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// MarkFlagRequired only checks presence; --name/--color "" or
-		// whitespace would otherwise reach the API and fail there.
-		if strings.TrimSpace(labelCreateName) == "" {
-			return fmt.Errorf("--name must not be empty")
-		}
-		if strings.TrimSpace(labelCreateColor) == "" {
-			return fmt.Errorf("--color must not be empty")
-		}
 		c, err := newClient()
 		if err != nil {
 			return err

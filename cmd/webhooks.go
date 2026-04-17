@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
@@ -74,9 +73,6 @@ var webhookGetCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get a webhook by ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if strings.TrimSpace(webhookID) == "" {
-			return fmt.Errorf("--id must not be empty")
-		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -93,12 +89,6 @@ var webhookCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a webhook",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if strings.TrimSpace(webhookCreateName) == "" {
-			return fmt.Errorf("--name must not be empty")
-		}
-		if strings.TrimSpace(webhookCreateURL) == "" {
-			return fmt.Errorf("--url must not be empty")
-		}
 		// Cobra's MarkFlagRequired only checks that --topics was passed,
 		// not that it contains any non-empty entry after trimming. A value
 		// like "," or "  ,  " collapses to an empty slice in splitCSV and
@@ -150,9 +140,6 @@ var webhookUpdateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update a webhook",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if strings.TrimSpace(webhookID) == "" {
-			return fmt.Errorf("--id must not be empty")
-		}
 		body, err := parseBodyJSON(webhookUpdateBodyJSON, webhookUpdateBodyFile)
 		if err != nil {
 			return err
@@ -176,9 +163,6 @@ var webhookDeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete a webhook",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if strings.TrimSpace(webhookID) == "" {
-			return fmt.Errorf("--id must not be empty")
-		}
 		c, err := newClient()
 		if err != nil {
 			return err

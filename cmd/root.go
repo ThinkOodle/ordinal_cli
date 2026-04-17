@@ -11,6 +11,7 @@ import (
 	"github.com/ordinal-cli/ordinal/internal/config"
 	"github.com/ordinal-cli/ordinal/internal/output"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 var (
@@ -79,9 +80,38 @@ var rootCmd = &cobra.Command{
 		if !output.IsValidFormat(output.Format(appConfig.OutputFormat)) {
 			return fmt.Errorf("invalid output format %q: must be one of json, table, csv", appConfig.OutputFormat)
 		}
-
-		return nil
+		return validateRequiredStringFlags(cmd)
 	},
+}
+
+// validateRequiredStringFlags rejects required string flags whose value is
+// empty or whitespace-only. Cobra's MarkFlagRequired is satisfied by
+// presence alone, so --post-id "" would otherwise reach the API and surface
+// as a less-actionable 400/404. Running this in PersistentPreRunE guarantees
+// validation happens before any RunE constructs a client. Flags that were
+// not passed at all are left to Cobra's ValidateRequiredFlags so the
+// "required flag not set" message stays consistent.
+func validateRequiredStringFlags(cmd *cobra.Command) error {
+	var empty []string
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		ann, ok := f.Annotations[cobra.BashCompOneRequiredFlag]
+		if !ok || len(ann) == 0 || ann[0] != "true" {
+			return
+		}
+		if f.Value.Type() != "string" {
+			return
+		}
+		if !f.Changed {
+			return
+		}
+		if strings.TrimSpace(f.Value.String()) == "" {
+			empty = append(empty, f.Name)
+		}
+	})
+	if len(empty) > 0 {
+		return fmt.Errorf(`required flag(s) "%s" must not be empty`, strings.Join(empty, `", "`))
+	}
+	return nil
 }
 
 func init() {

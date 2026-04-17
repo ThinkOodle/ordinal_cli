@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
@@ -55,9 +54,6 @@ var engagementListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List engagements on a post",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if strings.TrimSpace(engagementPostID) == "" {
-			return fmt.Errorf("--post-id must not be empty")
-		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -74,13 +70,6 @@ var engagementCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create engagements on a post",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if strings.TrimSpace(engagementPostID) == "" {
-			return fmt.Errorf("--post-id must not be empty")
-		}
-		if strings.TrimSpace(engagementCreateChannel) == "" {
-			return fmt.Errorf("--channel must not be empty")
-		}
-
 		var raw []byte
 		var err2 error
 		switch {
@@ -127,9 +116,6 @@ var engagementUpdateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update an engagement",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if strings.TrimSpace(engagementID) == "" {
-			return fmt.Errorf("--id must not be empty")
-		}
 		body, err := parseBodyJSON(engagementUpdateBodyJSON, engagementUpdateBodyFile)
 		if err != nil {
 			return err
@@ -153,9 +139,6 @@ var engagementDeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete an engagement",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if strings.TrimSpace(engagementID) == "" {
-			return fmt.Errorf("--id must not be empty")
-		}
 		c, err := newClient()
 		if err != nil {
 			return err
