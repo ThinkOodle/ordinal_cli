@@ -106,8 +106,11 @@ func getOutputFormat() output.Format {
 }
 
 // printResult formats and prints the result according to the current output format.
-// Any pagination footer is emitted on stderr so it stays visible in table/csv
-// modes without polluting a parseable CSV body on stdout.
+// For CSV, the pagination footer goes to stderr so stdout stays strictly
+// parseable. For table output the footer goes to stdout beneath the rows so it
+// isn't separated from the table when stdout is piped through a pager or
+// redirected (stdout/stderr are buffered independently, so stderr footers can
+// arrive out of order or bypass the pager entirely).
 func printResult(data interface{}) error {
 	format := getOutputFormat()
 	out, footer, err := output.FormatOutput(data, format)
@@ -116,7 +119,11 @@ func printResult(data interface{}) error {
 	}
 	fmt.Println(out)
 	if footer != "" {
-		fmt.Fprintln(os.Stderr, footer)
+		if format == output.FormatCSV {
+			fmt.Fprintln(os.Stderr, footer)
+		} else {
+			fmt.Println(footer)
+		}
 	}
 	return nil
 }
