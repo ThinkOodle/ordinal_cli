@@ -69,3 +69,31 @@ func TestInstall_InvalidTarget(t *testing.T) {
 		t.Errorf("expected error for invalid target")
 	}
 }
+
+// A conflict on any target must abort the whole install without writing
+// any target. Prior behavior walked targets in sorted order and wrote each
+// one as it went, so a conflict on "claude" after "agents" had already been
+// written left the filesystem in a partially-applied state.
+func TestInstall_ConflictAbortsBeforeAnyWrite(t *testing.T) {
+	home := t.TempDir()
+	claudePath := filepath.Join(home, ".claude/skills/ordinal-cli/SKILL.md")
+	if err := os.MkdirAll(filepath.Dir(claudePath), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(claudePath, []byte("pre-existing"), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	agentsPath := filepath.Join(home, ".agents/skills/ordinal-cli/SKILL.md")
+
+	results, err := Install(InstallOptions{HomeDir: home, Targets: []string{"agents", "claude"}})
+	if err == nil {
+		t.Fatalf("expected conflict error, got results=%+v", results)
+	}
+	if _, statErr := os.Stat(agentsPath); statErr == nil {
+		t.Errorf("agents target was written despite claude conflict: %s exists", agentsPath)
+	}
+	if data, _ := os.ReadFile(claudePath); string(data) != "pre-existing" {
+		t.Errorf("claude target was modified despite conflict; got %q", data)
+	}
+}

@@ -61,38 +61,51 @@ func Install(opts InstallOptions) ([]InstallResult, error) {
 		return nil, fmt.Errorf("reading bundled skill: %w", err)
 	}
 
-	results := make([]InstallResult, 0, len(targets))
+	// Preflight every target before touching the filesystem. A multi-target
+	// install must be all-or-nothing: if the second target would fail the
+	// "already exists" check, we do not want the first target already written
+	// to disk and the command still exiting non-zero.
+	type plan struct {
+		target string
+		root   string
+		path   string
+		status string
+		write  bool
+	}
+	plans := make([]plan, 0, len(targets))
 	for _, target := range targets {
 		root := filepath.Join(homeDir, targetRoots[target], skillName)
-		if err := os.MkdirAll(root, 0755); err != nil {
-			return results, fmt.Errorf("creating %s skill directory: %w", target, err)
-		}
-
 		path := filepath.Join(root, skillFile)
-		result := InstallResult{
-			Target: target,
-			Path:   path,
-			Status: "installed",
-		}
+		p := plan{target: target, root: root, path: path, status: "installed", write: true}
 
 		existing, err := os.ReadFile(path)
 		switch {
 		case err == nil && bytes.Equal(existing, content):
-			result.Status = "unchanged"
+			p.status = "unchanged"
+			p.write = false
+		case err == nil && !opts.Force:
+			return nil, fmt.Errorf("skill already exists at %s; rerun with --force to overwrite", path)
+		case err == nil:
+			p.status = "updated"
+		case !os.IsNotExist(err):
+			return nil, fmt.Errorf("reading existing skill at %s: %w", path, err)
+		}
+		plans = append(plans, p)
+	}
+
+	results := make([]InstallResult, 0, len(plans))
+	for _, p := range plans {
+		result := InstallResult{Target: p.target, Path: p.path, Status: p.status}
+		if !p.write {
 			results = append(results, result)
 			continue
-		case err == nil && !opts.Force:
-			return results, fmt.Errorf("skill already exists at %s; rerun with --force to overwrite", path)
-		case err == nil:
-			result.Status = "updated"
-		case !os.IsNotExist(err):
-			return results, fmt.Errorf("reading existing skill at %s: %w", path, err)
 		}
-
-		if err := os.WriteFile(path, content, 0644); err != nil {
-			return results, fmt.Errorf("writing skill to %s: %w", path, err)
+		if err := os.MkdirAll(p.root, 0755); err != nil {
+			return results, fmt.Errorf("creating %s skill directory: %w", p.target, err)
 		}
-
+		if err := os.WriteFile(p.path, content, 0644); err != nil {
+			return results, fmt.Errorf("writing skill to %s: %w", p.path, err)
+		}
 		results = append(results, result)
 	}
 

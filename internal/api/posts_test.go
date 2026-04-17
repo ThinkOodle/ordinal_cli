@@ -158,6 +158,27 @@ func TestPostService_ListAll_RepeatedCursor(t *testing.T) {
 	}
 }
 
+// TestPostService_ListAll_HonorsLimit locks in that ListAll uses the caller's
+// params.Limit as the page size rather than silently forcing 100. Prior
+// behavior made --all --limit N behave identically to --all --limit 100.
+func TestPostService_ListAll_HonorsLimit(t *testing.T) {
+	var gotLimits []string
+	svc := NewPostService(newTestClient(func(r *http.Request) (*http.Response, error) {
+		gotLimits = append(gotLimits, r.URL.Query().Get("limit"))
+		return jsonResponse(t, http.StatusOK, models.PostListResponse{
+			Posts:   []models.Post{{ID: "p1"}},
+			HasMore: false,
+		}), nil
+	}))
+
+	if _, err := svc.ListAll(models.ListPostsParams{Limit: 10}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(gotLimits) != 1 || gotLimits[0] != "10" {
+		t.Errorf("expected limit=10 on request, got %v", gotLimits)
+	}
+}
+
 // TestPostService_ListAll_TwoCursorCycle locks in that a server alternating
 // between two cursors (A -> B -> A -> B ...) with hasMore=true is detected
 // and aborted instead of looping forever. The adjacent-cursor guard alone

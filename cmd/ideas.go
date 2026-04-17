@@ -200,10 +200,10 @@ var ideaUpdateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update an idea",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := newClient()
-		if err != nil {
-			return err
-		}
+		// Parse and validate the update body before dialing the API so a
+		// pure-local mistake ("no fields to update", malformed JSON) surfaces
+		// immediately, instead of being masked by an unrelated auth error
+		// from newClient() when the user hasn't configured an API key.
 		body, err := parseBodyJSON(ideaUpdateBodyJSON, ideaUpdateBodyFile)
 		if err != nil {
 			return err
@@ -229,6 +229,10 @@ var ideaUpdateCmd = &cobra.Command{
 		}
 		if len(body) == 0 {
 			return fmt.Errorf("no fields to update; provide flags or --body-json/--body-file")
+		}
+		c, err := newClient()
+		if err != nil {
+			return err
 		}
 		data, err := api.NewIdeaService(c).Update(ideaID, body)
 		if err != nil {

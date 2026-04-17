@@ -177,6 +177,35 @@ func TestIdeaUpdate_ClearsLabelsWithEmptyFlag(t *testing.T) {
 	}
 }
 
+// TestIdeaUpdate_NoOpValidatesBeforeAuth locks in the ordering: when no
+// fields are provided, the local "no fields to update" error must surface
+// ahead of newClient()'s auth error so users with no API key configured
+// still see the actionable local complaint.
+func TestIdeaUpdate_NoOpValidatesBeforeAuth(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ORDINAL_API_KEY", "")
+	t.Setenv("ORDINAL_OUTPUT_FORMAT", "")
+	t.Setenv("ORDINAL_VERBOSE", "")
+
+	resetIdeaUpdateFlags(t)
+
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetErr(&buf)
+	rootCmd.SetArgs([]string{"idea", "update", "--id", "i-1"})
+
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if strings.Contains(err.Error(), "api key") {
+		t.Errorf("validation should run before auth; got auth error: %v", err)
+	}
+	if !strings.Contains(err.Error(), "no fields to update") {
+		t.Errorf("expected no-op error, got: %v", err)
+	}
+}
+
 // resetIdeaUpdateFlags clears ideaUpdateCmd's package-level flag variables
 // and the pflag "changed" bits so consecutive Execute calls on the shared
 // rootCmd don't leak state between tests.

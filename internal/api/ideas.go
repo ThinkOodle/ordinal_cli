@@ -73,14 +73,18 @@ func (s *IdeaService) List(params models.ListIdeasParams) (*models.IdeaListRespo
 // ListAll fetches all ideas by auto-paginating. Fails fast on inconsistent
 // cursor metadata (hasMore=true with empty nextCursor, or any cursor the
 // server has already handed out in this run) rather than spinning forever
-// or silently truncating results.
+// or silently truncating results. Honors the caller's params.Limit as the
+// per-request page size, defaulting to 100 when unset, so --all --limit N
+// behaves consistently with what the flag advertises.
 func (s *IdeaService) ListAll(params models.ListIdeasParams) ([]models.Idea, error) {
 	var all []models.Idea
 	cursor := params.Cursor
 	seen := make(map[string]struct{})
+	if params.Limit <= 0 {
+		params.Limit = 100
+	}
 
 	for {
-		params.Limit = 100
 		params.Cursor = cursor
 
 		resp, err := s.List(params)

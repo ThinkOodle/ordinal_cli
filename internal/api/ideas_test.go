@@ -44,6 +44,26 @@ func TestIdeaService_ListAll_EmptyNextCursor(t *testing.T) {
 	}
 }
 
+// TestIdeaService_ListAll_HonorsLimit locks in that ListAll uses the caller's
+// params.Limit as the page size rather than silently forcing 100.
+func TestIdeaService_ListAll_HonorsLimit(t *testing.T) {
+	var gotLimits []string
+	svc := NewIdeaService(newTestClient(func(r *http.Request) (*http.Response, error) {
+		gotLimits = append(gotLimits, r.URL.Query().Get("limit"))
+		return jsonResponse(t, http.StatusOK, models.IdeaListResponse{
+			Ideas:   []models.Idea{{ID: "i1"}},
+			HasMore: false,
+		}), nil
+	}))
+
+	if _, err := svc.ListAll(models.ListIdeasParams{Limit: 25}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(gotLimits) != 1 || gotLimits[0] != "25" {
+		t.Errorf("expected limit=25 on request, got %v", gotLimits)
+	}
+}
+
 // TestIdeaService_ListAll_RepeatedCursor locks in that a server returning
 // the same cursor twice breaks out with an error instead of spinning forever.
 func TestIdeaService_ListAll_RepeatedCursor(t *testing.T) {

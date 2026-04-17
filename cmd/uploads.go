@@ -67,10 +67,12 @@ var uploadGetCmd = &cobra.Command{
 // printRawJSON parses a raw JSON payload and formats it via printResult. Use
 // this for GET/read endpoints: a zero-length body — what the API returns for
 // 204 No Content — is treated as a successful acknowledgement rather than a
-// parse error, but a legitimate empty JSON object ({}) passes through
-// unchanged so the caller sees whatever the API actually returned. Mutation
-// endpoints that conventionally respond with {} on success should call
-// printMutationAck instead.
+// parse error. Everything else, including a legitimate empty JSON object,
+// flows through the format-aware printer so --output csv stays strictly
+// parseable instead of emitting raw JSON. Mutation endpoints that respond
+// with {} on success should call printMutationAck instead; only that helper
+// rewrites {} into a "success" object, because mutations need a clear
+// acknowledgement and reads do not.
 func printRawJSON(data []byte) error {
 	if len(bytes.TrimSpace(data)) == 0 {
 		return printResult(map[string]interface{}{"success": true})
@@ -78,15 +80,6 @@ func printRawJSON(data []byte) error {
 	var v interface{}
 	if err := json.Unmarshal(data, &v); err != nil {
 		return fmt.Errorf("parsing response: %w", err)
-	}
-	// A legitimate {} from a read endpoint must render as "{}" across
-	// every output format. The table/CSV formatter deliberately collapses
-	// empty objects to "No results" / empty body (mutation acks need
-	// that), so intercept here to keep the read-path promise that {}
-	// passes through unchanged — regardless of --output.
-	if m, ok := v.(map[string]interface{}); ok && len(m) == 0 {
-		fmt.Println("{}")
-		return nil
 	}
 	return printResult(v)
 }

@@ -295,20 +295,26 @@ func TestPrintRawJSON_EmptyObjectPassesThrough(t *testing.T) {
 	}
 }
 
-// TestPrintRawJSON_EmptyObjectRendersLiteralAcrossFormats locks in the
-// read-path promise that a legitimate {} response renders as "{}" under
-// every output format. The formatter deliberately collapses empty objects
-// to "No results" (table) or an empty body (CSV) because mutation acks
-// want that; read endpoints want fidelity, so printRawJSON must intercept
-// before handing {} to the formatter. Covers table and CSV specifically:
-// the existing JSON-only assertion doesn't exercise the formatter path
-// where the bug lived.
-func TestPrintRawJSON_EmptyObjectRendersLiteralAcrossFormats(t *testing.T) {
+// TestPrintRawJSON_EmptyObjectIsFormatAware locks in that an empty-object
+// read response is rendered through the format-aware printer rather than
+// as a literal "{}" smuggled past the formatter. The earlier fix emitted
+// raw JSON under --output csv, which broke the "csv body stays strictly
+// parseable" contract. Each format's canonical empty rendering is asserted
+// here so a future regression to the raw-{} shortcut fails the test.
+func TestPrintRawJSON_EmptyObjectIsFormatAware(t *testing.T) {
 	prev := appConfig
 	t.Cleanup(func() { appConfig = prev })
 
-	for _, format := range []string{"json", "table", "csv"} {
-		t.Run(format, func(t *testing.T) {
+	cases := []struct {
+		format string
+		want   string
+	}{
+		{"json", "{}"},
+		{"table", "No results"},
+		{"csv", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.format, func(t *testing.T) {
 			r, w, err := os.Pipe()
 			if err != nil {
 				t.Fatalf("pipe: %v", err)
@@ -316,7 +322,7 @@ func TestPrintRawJSON_EmptyObjectRendersLiteralAcrossFormats(t *testing.T) {
 			origStdout := os.Stdout
 			os.Stdout = w
 
-			appConfig = &config.Config{OutputFormat: format}
+			appConfig = &config.Config{OutputFormat: tc.format}
 			if err := printRawJSON([]byte("{}")); err != nil {
 				os.Stdout = origStdout
 				t.Fatalf("printRawJSON: %v", err)
@@ -332,11 +338,12 @@ func TestPrintRawJSON_EmptyObjectRendersLiteralAcrossFormats(t *testing.T) {
 				t.Fatalf("read: %v", err)
 			}
 			got := strings.TrimSpace(buf.String())
-			if got != "{}" {
-				t.Errorf("format=%s: expected literal {} on stdout; got %q", format, buf.String())
+			if got != tc.want {
+				t.Errorf("format=%s: want %q, got %q", tc.format, tc.want, buf.String())
 			}
-			if strings.Contains(buf.String(), "No results") {
-				t.Errorf("format=%s: table/csv must not collapse {} to 'No results': %q", format, buf.String())
+			// Raw JSON must not leak into csv/table output.
+			if tc.format != "json" && strings.Contains(buf.String(), "{}") {
+				t.Errorf("format=%s: raw JSON leaked into output: %q", tc.format, buf.String())
 			}
 		})
 	}
