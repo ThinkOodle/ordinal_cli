@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/spf13/cobra"
 )
@@ -24,6 +27,9 @@ var instagramSearchLocationsCmd = &cobra.Command{
 	Use:   "search-locations",
 	Short: "Search Instagram locations",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(instagramSearchQuery) == "" {
+			return fmt.Errorf("--query must not be empty")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err

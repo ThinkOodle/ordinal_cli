@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
@@ -35,6 +36,9 @@ var uploadCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Upload a file from a URL",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(uploadCreateURL) == "" {
+			return fmt.Errorf("--url must not be empty")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -51,6 +55,9 @@ var uploadGetCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get the status of an upload job",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(uploadID) == "" {
+			return fmt.Errorf("--id must not be empty")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err

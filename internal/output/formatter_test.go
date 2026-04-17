@@ -1,6 +1,7 @@
 package output
 
 import (
+	"encoding/csv"
 	"strings"
 	"testing"
 )
@@ -179,6 +180,72 @@ func TestFormatOutput_EmptyEnvelope(t *testing.T) {
 	// Zero-value pagination fields (final page) should not produce noise.
 	if footer != "" {
 		t.Errorf("expected empty footer for terminal page; got %q", footer)
+	}
+}
+
+// Nested composite cell values (maps, slices) must serialize as compact JSON
+// so table/CSV output stays well-formed and stable. fmt.Sprintf("%v", v) on a
+// map produces Go-style literals like "map[k:v]" with unstable key ordering,
+// which breaks diffing and downstream parsing for fields like webhook headers
+// or idea labels.
+func TestFormatOutput_NestedMapRendersAsJSON(t *testing.T) {
+	items := []map[string]interface{}{
+		{
+			"id":      "1",
+			"headers": map[string]interface{}{"X-Key": "value", "X-Other": "v2"},
+		},
+	}
+	out, _, err := FormatOutput(items, FormatTable)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(out, "map[") {
+		t.Errorf("nested map should not render as Go literal; got %q", out)
+	}
+	if !strings.Contains(out, `{"X-Key":"value","X-Other":"v2"}`) {
+		t.Errorf("expected compact JSON with sorted keys; got %q", out)
+	}
+}
+
+func TestFormatOutput_NestedSliceRendersAsJSON_CSV(t *testing.T) {
+	items := []map[string]interface{}{
+		{
+			"id": "1",
+			"labels": []interface{}{
+				map[string]interface{}{"id": "lbl_1", "name": "priority"},
+				map[string]interface{}{"id": "lbl_2", "name": "growth"},
+			},
+		},
+	}
+	out, _, err := FormatOutput(items, FormatCSV)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(out, "map[") {
+		t.Errorf("nested slice should not render as Go literal; got %q", out)
+	}
+	// The CSV writer double-quotes cells containing quotes, so compare the
+	// parsed cell value (quotes unescaped) rather than raw CSV bytes.
+	r := csv.NewReader(strings.NewReader(out))
+	records, err := r.ReadAll()
+	if err != nil {
+		t.Fatalf("parsing csv: %v", err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("expected header + 1 row; got %d", len(records))
+	}
+	labelsIdx := -1
+	for i, h := range records[0] {
+		if h == "labels" {
+			labelsIdx = i
+		}
+	}
+	if labelsIdx < 0 {
+		t.Fatalf("labels header missing: %v", records[0])
+	}
+	want := `[{"id":"lbl_1","name":"priority"},{"id":"lbl_2","name":"growth"}]`
+	if got := records[1][labelsIdx]; got != want {
+		t.Errorf("expected labels cell %q; got %q", want, got)
 	}
 }
 

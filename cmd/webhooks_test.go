@@ -54,6 +54,56 @@ func TestWebhookCreate_RejectsEmptyTopics(t *testing.T) {
 	}
 }
 
+// TestWebhookCreate_RejectsNonStringHeaderValues guards against silently
+// stringifying numeric/nested header values. HTTP headers are string-valued,
+// and {"X-Retry":3} should fail locally rather than ship as "3" to the API.
+func TestWebhookCreate_RejectsNonStringHeaderValues(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ORDINAL_API_KEY", "test-key")
+	t.Setenv("ORDINAL_OUTPUT_FORMAT", "")
+	t.Setenv("ORDINAL_VERBOSE", "")
+
+	tests := []struct {
+		name    string
+		headers string
+	}{
+		{"number value", `{"X-Retry":3}`},
+		{"nested object", `{"X-Meta":{"a":1}}`},
+		{"array value", `{"X-List":["a","b"]}`},
+		{"bool value", `{"X-Flag":true}`},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			webhookCreateName = ""
+			webhookCreateURL = ""
+			webhookCreateDescription = ""
+			webhookCreateTopics = ""
+			webhookCreateHeadersJSON = ""
+			cfgOutputFormat = ""
+
+			var buf bytes.Buffer
+			rootCmd.SetOut(&buf)
+			rootCmd.SetErr(&buf)
+			rootCmd.SetArgs([]string{
+				"webhook", "create",
+				"--name", "n",
+				"--url", "https://example.com/h",
+				"--topics", "post.created",
+				"--headers", tc.headers,
+			})
+
+			err := rootCmd.Execute()
+			if err == nil {
+				t.Fatalf("expected error for headers=%q", tc.headers)
+			}
+			if !strings.Contains(err.Error(), "must be a string") {
+				t.Errorf("expected 'must be a string' error, got: %v", err)
+			}
+		})
+	}
+}
+
 // TestWebhookUpdate_RejectsEmptyBody guards parity with post/idea update: an
 // empty {} body is a no-op and must fail locally rather than reach the API.
 func TestWebhookUpdate_RejectsEmptyBody(t *testing.T) {

@@ -324,13 +324,38 @@ func mapSliceToRows(items []map[string]interface{}) ([][]string, []string, error
 			if !ok || v == nil {
 				row[j] = ""
 			} else {
-				row[j] = fmt.Sprintf("%v", v)
+				row[j] = formatCell(v)
 			}
 		}
 		rows[i] = row
 	}
 
 	return rows, headers, nil
+}
+
+// formatCell renders a single table/CSV cell value. Scalars (string, bool,
+// numbers) use their natural string form. Composite values (maps, slices)
+// are serialized as compact JSON so nested data is stable and parseable
+// instead of rendering as Go-style literals like "map[k:v]" whose map key
+// ordering is not guaranteed.
+func formatCell(v interface{}) string {
+	switch vv := v.(type) {
+	case string:
+		return vv
+	case bool, float64, int, int64:
+		return fmt.Sprintf("%v", vv)
+	case []interface{}, map[string]interface{}:
+		b, err := json.Marshal(vv)
+		if err != nil {
+			return fmt.Sprintf("%v", vv)
+		}
+		return string(b)
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Sprintf("%v", v)
+	}
+	return string(b)
 }
 
 // padRight pads a string with spaces to the given width.

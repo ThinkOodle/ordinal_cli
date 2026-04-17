@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
@@ -54,6 +55,9 @@ var engagementListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List engagements on a post",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(engagementPostID) == "" {
+			return fmt.Errorf("--post-id must not be empty")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -70,9 +74,11 @@ var engagementCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create engagements on a post",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := newClient()
-		if err != nil {
-			return err
+		if strings.TrimSpace(engagementPostID) == "" {
+			return fmt.Errorf("--post-id must not be empty")
+		}
+		if strings.TrimSpace(engagementCreateChannel) == "" {
+			return fmt.Errorf("--channel must not be empty")
 		}
 
 		var raw []byte
@@ -101,6 +107,10 @@ var engagementCreateCmd = &cobra.Command{
 			return fmt.Errorf("engagements array must contain at least one engagement")
 		}
 
+		c, err := newClient()
+		if err != nil {
+			return err
+		}
 		req := models.CreateEngagementsRequest{
 			Channel:     engagementCreateChannel,
 			Engagements: engagements,
@@ -117,9 +127,8 @@ var engagementUpdateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update an engagement",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := newClient()
-		if err != nil {
-			return err
+		if strings.TrimSpace(engagementID) == "" {
+			return fmt.Errorf("--id must not be empty")
 		}
 		body, err := parseBodyJSON(engagementUpdateBodyJSON, engagementUpdateBodyFile)
 		if err != nil {
@@ -127,6 +136,10 @@ var engagementUpdateCmd = &cobra.Command{
 		}
 		if len(body) == 0 {
 			return fmt.Errorf("no fields to update; provide --body-json or --body-file")
+		}
+		c, err := newClient()
+		if err != nil {
+			return err
 		}
 		data, err := api.NewEngagementService(c).Update(engagementID, body)
 		if err != nil {
@@ -140,6 +153,9 @@ var engagementDeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete an engagement",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(engagementID) == "" {
+			return fmt.Errorf("--id must not be empty")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
@@ -73,6 +74,9 @@ var webhookGetCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get a webhook by ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(webhookID) == "" {
+			return fmt.Errorf("--id must not be empty")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -89,6 +93,12 @@ var webhookCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a webhook",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(webhookCreateName) == "" {
+			return fmt.Errorf("--name must not be empty")
+		}
+		if strings.TrimSpace(webhookCreateURL) == "" {
+			return fmt.Errorf("--url must not be empty")
+		}
 		// Cobra's MarkFlagRequired only checks that --topics was passed,
 		// not that it contains any non-empty entry after trimming. A value
 		// like "," or "  ,  " collapses to an empty slice in splitCSV and
@@ -96,10 +106,6 @@ var webhookCreateCmd = &cobra.Command{
 		topics := splitCSV(webhookCreateTopics)
 		if len(topics) == 0 {
 			return fmt.Errorf("--topics must contain at least one non-empty event topic")
-		}
-		c, err := newClient()
-		if err != nil {
-			return err
 		}
 		req := models.CreateWebhookRequest{
 			Name:        webhookCreateName,
@@ -115,13 +121,22 @@ var webhookCreateCmd = &cobra.Command{
 			if len(headers) > 0 {
 				req.Headers = map[string]string{}
 				for k, v := range headers {
-					if s, ok := v.(string); ok {
-						req.Headers[k] = s
-					} else {
-						req.Headers[k] = fmt.Sprintf("%v", v)
+					// HTTP headers are string-valued. Silently stringifying a
+					// number or nested object would mutate user input (e.g.
+					// {"X-Retry":3} becoming "3", {"k":{}} becoming "map[]")
+					// without warning. Reject locally so the user can fix the
+					// payload rather than shipping a surprise to the server.
+					s, ok := v.(string)
+					if !ok {
+						return fmt.Errorf("header %q must be a string, got %T", k, v)
 					}
+					req.Headers[k] = s
 				}
 			}
+		}
+		c, err := newClient()
+		if err != nil {
+			return err
 		}
 		w, err := api.NewWebhookService(c).Create(req)
 		if err != nil {
@@ -135,9 +150,8 @@ var webhookUpdateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update a webhook",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := newClient()
-		if err != nil {
-			return err
+		if strings.TrimSpace(webhookID) == "" {
+			return fmt.Errorf("--id must not be empty")
 		}
 		body, err := parseBodyJSON(webhookUpdateBodyJSON, webhookUpdateBodyFile)
 		if err != nil {
@@ -145,6 +159,10 @@ var webhookUpdateCmd = &cobra.Command{
 		}
 		if len(body) == 0 {
 			return fmt.Errorf("no fields to update; provide --body-json or --body-file")
+		}
+		c, err := newClient()
+		if err != nil {
+			return err
 		}
 		w, err := api.NewWebhookService(c).Update(webhookID, body)
 		if err != nil {
@@ -158,6 +176,9 @@ var webhookDeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete a webhook",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(webhookID) == "" {
+			return fmt.Errorf("--id must not be empty")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err

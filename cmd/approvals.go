@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
@@ -52,6 +53,9 @@ var approvalListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List approvals for a post",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(approvalPostID) == "" {
+			return fmt.Errorf("--post-id must not be empty")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err
@@ -69,9 +73,8 @@ var approvalCreateCmd = &cobra.Command{
 	Short: "Create approval requests for a post",
 	Long:  "Create one or more approval requests. Use --user-ids to request from multiple users with shared settings, or --body-json/--body-file for full control over each approval entry.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := newClient()
-		if err != nil {
-			return err
+		if strings.TrimSpace(approvalPostID) == "" {
+			return fmt.Errorf("--post-id must not be empty")
 		}
 
 		req := models.CreateApprovalsRequest{PostID: approvalPostID}
@@ -99,6 +102,10 @@ var approvalCreateCmd = &cobra.Command{
 			return fmt.Errorf("provide --user-ids or an approvals array via --body-json/--body-file")
 		}
 
+		c, err := newClient()
+		if err != nil {
+			return err
+		}
 		data, err := api.NewApprovalService(c).Create(req)
 		if err != nil {
 			return err
@@ -144,6 +151,9 @@ var approvalDeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete an approval",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(approvalID) == "" {
+			return fmt.Errorf("--id must not be empty")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err
