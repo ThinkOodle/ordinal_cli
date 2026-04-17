@@ -41,10 +41,13 @@ func (s *SubscriberService) Create(req models.CreateSubscribersRequest) (json.Ra
 	return data, nil
 }
 
-// Delete removes a subscriber by ID.
-func (s *SubscriberService) Delete(id string) error {
-	if _, err := s.client.Delete("/subscribers/" + id); err != nil {
-		return fmt.Errorf("deleting subscriber: %w", err)
+// Delete removes a subscriber by ID. The API returns a
+// `{"deletedSubscriber": Subscriber}` envelope; we forward it verbatim so
+// callers see the real server response instead of a fabricated acknowledgement.
+func (s *SubscriberService) Delete(id string) (json.RawMessage, error) {
+	data, err := s.client.Delete("/subscribers/" + id)
+	if err != nil {
+		return nil, fmt.Errorf("deleting subscriber: %w", err)
 	}
-	return nil
+	return data, nil
 }

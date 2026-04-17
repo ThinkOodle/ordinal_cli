@@ -49,10 +49,13 @@ func (s *LabelService) Create(req models.CreateLabelRequest) (*models.Label, err
 	return &label, nil
 }
 
-// Delete deletes a label by ID.
-func (s *LabelService) Delete(id string) error {
-	if _, err := s.client.Delete(labelsBasePath + "/" + id); err != nil {
-		return fmt.Errorf("deleting label: %w", err)
+// Delete deletes a label by ID. The API returns the deleted Label as the
+// response body; callers forward it to the formatter so JSON/CSV output
+// preserves full fidelity with the real API response.
+func (s *LabelService) Delete(id string) (json.RawMessage, error) {
+	data, err := s.client.Delete(labelsBasePath + "/" + id)
+	if err != nil {
+		return nil, fmt.Errorf("deleting label: %w", err)
 	}
-	return nil
+	return data, nil
 }

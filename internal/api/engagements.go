@@ -50,10 +50,13 @@ func (s *EngagementService) Update(id string, req models.UpdateEngagementRequest
 	return data, nil
 }
 
-// Delete deletes an engagement by ID.
-func (s *EngagementService) Delete(id string) error {
-	if _, err := s.client.Delete("/engagements/" + id); err != nil {
-		return fmt.Errorf("deleting engagement: %w", err)
+// Delete deletes an engagement by ID. The API returns
+// `{"success": true}` as the response body; forwarding it keeps --output json
+// and --output csv consistent with the raw API response.
+func (s *EngagementService) Delete(id string) (json.RawMessage, error) {
+	data, err := s.client.Delete("/engagements/" + id)
+	if err != nil {
+		return nil, fmt.Errorf("deleting engagement: %w", err)
 	}
-	return nil
+	return data, nil
 }

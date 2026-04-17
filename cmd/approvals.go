@@ -147,9 +147,10 @@ var approvalDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := api.NewApprovalService(c).Delete(approvalID); err != nil {
+		data, err := api.NewApprovalService(c).Delete(approvalID)
+		if err != nil {
 			return err
 		}
-		return printResult(deletedAck("approval", approvalID))
+		return printMutationAck(data)
 	},
 }

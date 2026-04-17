@@ -79,8 +79,16 @@ func TestSlackBoostService_CreateGetUpdateDelete(t *testing.T) {
 	if updated.ID != "sb1" || updated.Copy != "updated" {
 		t.Errorf("unexpected updated boost: %+v", updated)
 	}
-	if err := svc.Delete("sb1"); err != nil {
+	data, err := svc.Delete("sb1")
+	if err != nil {
 		t.Fatalf("delete: %v", err)
+	}
+	var ack map[string]bool
+	if err := json.Unmarshal(data, &ack); err != nil {
+		t.Fatalf("parse delete body: %v", err)
+	}
+	if !ack["success"] {
+		t.Errorf("expected real API body with success=true; got %v", ack)
 	}
 }
 

@@ -47,14 +47,21 @@ func TestEngagementService_UpdateDelete(t *testing.T) {
 	paths := map[string]string{}
 	svc := NewEngagementService(newTestClient(func(r *http.Request) (*http.Response, error) {
 		paths[r.URL.Path] = r.Method
-		return jsonResponse(t, http.StatusOK, map[string]string{"id": "e1"}), nil
+		// Both /engagements/{id} PATCH and DELETE return real JSON bodies;
+		// the test doesn't rely on exact shapes, only that the raw bytes
+		// flow back to the caller unchanged.
+		return jsonResponse(t, http.StatusOK, map[string]bool{"success": true}), nil
 	}))
 
 	if _, err := svc.Update("e1", map[string]interface{}{"copy": "hi"}); err != nil {
 		t.Fatalf("update failed: %v", err)
 	}
-	if err := svc.Delete("e1"); err != nil {
+	data, err := svc.Delete("e1")
+	if err != nil {
 		t.Fatalf("delete failed: %v", err)
+	}
+	if len(data) == 0 {
+		t.Errorf("expected delete to forward the real API body; got empty")
 	}
 	if paths["/engagements/e1"] == "" {
 		t.Errorf("expected /engagements/e1, got %v", paths)

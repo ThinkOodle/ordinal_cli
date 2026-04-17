@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	slackBoostPostID         string
-	slackBoostID             string
+	slackBoostPostID          string
+	slackBoostID              string
 	slackBoostCreateWebhookID string
 	slackBoostCreateCopy      string
 	slackBoostUpdateCopy      string
@@ -145,10 +145,11 @@ var slackBoostDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := api.NewSlackBoostService(c).Delete(slackBoostID); err != nil {
+		data, err := api.NewSlackBoostService(c).Delete(slackBoostID)
+		if err != nil {
 			return err
 		}
-		return printResult(deletedAck("slack-boost", slackBoostID))
+		return printMutationAck(data)
 	},
 }
 

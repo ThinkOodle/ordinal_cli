@@ -61,10 +61,23 @@ func TestApprovalService_Delete(t *testing.T) {
 		if r.Method != http.MethodDelete {
 			t.Errorf("expected DELETE, got %s", r.Method)
 		}
-		return jsonResponse(t, http.StatusOK, map[string]bool{"success": true}), nil
+		// /approvals/{id} DELETE returns `{"deletedApproval": Approval}`.
+		return jsonResponse(t, http.StatusOK, map[string]interface{}{
+			"deletedApproval": models.Approval{ID: "a1", Status: "Approved"},
+		}), nil
 	}))
 
-	if err := svc.Delete("a1"); err != nil {
+	data, err := svc.Delete("a1")
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	var got struct {
+		DeletedApproval models.Approval `json:"deletedApproval"`
+	}
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("parse delete body: %v", err)
+	}
+	if got.DeletedApproval.ID != "a1" {
+		t.Errorf("expected deleted approval id=a1; got %+v", got.DeletedApproval)
 	}
 }

@@ -76,10 +76,12 @@ func (s *WebhookService) Update(id string, req models.UpdateWebhookRequest) (*mo
 	return &w, nil
 }
 
-// Delete deletes a webhook by ID.
-func (s *WebhookService) Delete(id string) error {
-	if _, err := s.client.Delete(webhooksBasePath + "/" + id); err != nil {
-		return fmt.Errorf("deleting webhook: %w", err)
+// Delete deletes a webhook by ID. The API returns `{"success": true}`;
+// forwarding it keeps CLI output honest about the real API response.
+func (s *WebhookService) Delete(id string) (json.RawMessage, error) {
+	data, err := s.client.Delete(webhooksBasePath + "/" + id)
+	if err != nil {
+		return nil, fmt.Errorf("deleting webhook: %w", err)
 	}
-	return nil
+	return data, nil
 }

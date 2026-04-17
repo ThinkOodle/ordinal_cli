@@ -167,9 +167,10 @@ var webhookDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := api.NewWebhookService(c).Delete(webhookID); err != nil {
+		data, err := api.NewWebhookService(c).Delete(webhookID)
+		if err != nil {
 			return err
 		}
-		return printResult(deletedAck("webhook", webhookID))
+		return printMutationAck(data)
 	},
 }

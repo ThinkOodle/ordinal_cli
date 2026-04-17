@@ -355,11 +355,11 @@ func TestDisplayWidth(t *testing.T) {
 		{"abc", 3},
 		{"🚀", 2},
 		{"中文", 4},
-		{"café", 4},                           // 'é' precomposed: narrow
-		{"cafe\u0301", 4},                    // 'e' + combining acute: combining mark is 0-width
-		{"a\u200Db", 2},                      // ZWJ is 0-width
-		{"\u270C\uFE0F", 1},                  // victory hand U+270C (Neutral kind here) + VS-16 — VS is 0; base is narrow per EAW
-		{"hi\tthere", 7},                     // control char (\t) treated as 0; we sanitize before measuring anyway
+		{"café", 4},         // 'é' precomposed: narrow
+		{"cafe\u0301", 4},   // 'e' + combining acute: combining mark is 0-width
+		{"a\u200Db", 2},     // ZWJ is 0-width
+		{"\u270C\uFE0F", 1}, // victory hand U+270C (Neutral kind here) + VS-16 — VS is 0; base is narrow per EAW
+		{"hi\tthere", 7},    // control char (\t) treated as 0; we sanitize before measuring anyway
 	}
 	for _, c := range cases {
 		if got := displayWidth(c.in); got != c.want {

@@ -46,10 +46,12 @@ func (s *CommentService) Create(postID string, req models.CreateCommentRequest) 
 	return &c, nil
 }
 
-// Delete deletes a comment by ID. Only the author can delete their own comment.
-func (s *CommentService) Delete(commentID string) error {
-	if _, err := s.client.Delete("/comments/" + commentID); err != nil {
-		return fmt.Errorf("deleting comment: %w", err)
+// Delete deletes a comment by ID. Only the author can delete their own
+// comment. The API returns the deleted Comment as the response body.
+func (s *CommentService) Delete(commentID string) (json.RawMessage, error) {
+	data, err := s.client.Delete("/comments/" + commentID)
+	if err != nil {
+		return nil, fmt.Errorf("deleting comment: %w", err)
 	}
-	return nil
+	return data, nil
 }

@@ -23,7 +23,8 @@ func TestInviteService_CRUD(t *testing.T) {
 				SentEmail: true,
 			}), nil
 		case r.Method == http.MethodDelete && r.URL.Path == "/invites/i1":
-			return jsonResponse(t, http.StatusOK, map[string]bool{"success": true}), nil
+			// /invites/{id} DELETE returns `{"deleted": true}` in the spec.
+			return jsonResponse(t, http.StatusOK, map[string]bool{"deleted": true}), nil
 		}
 		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		return jsonResponse(t, http.StatusBadRequest, nil), nil
@@ -42,8 +43,16 @@ func TestInviteService_CRUD(t *testing.T) {
 	if created.Invite == nil || created.Invite.ID != "i2" || created.Invite.Email != "new@example.com" {
 		t.Fatalf("create: unexpected invite %+v", created.Invite)
 	}
-	if err := svc.Delete("i1"); err != nil {
+	data, err := svc.Delete("i1")
+	if err != nil {
 		t.Fatalf("delete: %v", err)
+	}
+	var got map[string]bool
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("parse delete body: %v", err)
+	}
+	if !got["deleted"] {
+		t.Errorf("delete: expected real API body with deleted=true; got %v", got)
 	}
 }
 

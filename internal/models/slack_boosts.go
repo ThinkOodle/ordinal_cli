@@ -9,13 +9,13 @@ type SlackWebhookSummary struct {
 
 // SlackBoost represents a Slack boost attached to a post.
 type SlackBoost struct {
-	ID            string              `json:"id"`
-	Copy          string              `json:"copy,omitempty"`
-	IsAutoCreated bool                `json:"isAutoCreated"`
-	PostID        string              `json:"postId,omitempty"`
-	SlackWebhook  SlackWebhookSummary `json:"slackWebhook,omitempty"`
-	CreatedAt     string              `json:"createdAt,omitempty"`
-	UpdatedAt     string              `json:"updatedAt,omitempty"`
+	ID            string               `json:"id"`
+	Copy          string               `json:"copy,omitempty"`
+	IsAutoCreated bool                 `json:"isAutoCreated"`
+	PostID        string               `json:"postId,omitempty"`
+	SlackWebhook  *SlackWebhookSummary `json:"slackWebhook,omitempty"`
+	CreatedAt     string               `json:"createdAt,omitempty"`
+	UpdatedAt     string               `json:"updatedAt,omitempty"`
 }
 
 // CreateSlackBoostRequest is the request body for creating a Slack boost.

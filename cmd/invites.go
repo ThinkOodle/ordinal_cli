@@ -69,9 +69,10 @@ var inviteDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := api.NewInviteService(c).Delete(inviteID); err != nil {
+		data, err := api.NewInviteService(c).Delete(inviteID)
+		if err != nil {
 			return err
 		}
-		return printResult(deletedAck("invite", inviteID))
+		return printMutationAck(data)
 	},
 }

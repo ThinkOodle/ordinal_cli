@@ -84,12 +84,15 @@ func (s *SlackBoostService) Update(id string, req models.UpdateSlackBoostRequest
 	return &env.SlackBoost, nil
 }
 
-// Delete deletes a Slack boost by ID.
-func (s *SlackBoostService) Delete(id string) error {
-	if _, err := s.client.Delete(slackBoostsBasePath + "/" + id); err != nil {
-		return fmt.Errorf("deleting slack boost: %w", err)
+// Delete deletes a Slack boost by ID. The API returns `{"success": true}`;
+// forwarding the raw body keeps output consistent with other mutation
+// endpoints.
+func (s *SlackBoostService) Delete(id string) (json.RawMessage, error) {
+	data, err := s.client.Delete(slackBoostsBasePath + "/" + id)
+	if err != nil {
+		return nil, fmt.Errorf("deleting slack boost: %w", err)
 	}
-	return nil
+	return data, nil
 }
 
 // SlackWebhookService handles Slack webhook (boost channel) API calls.

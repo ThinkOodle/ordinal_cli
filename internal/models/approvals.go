@@ -18,8 +18,8 @@ type Approval struct {
 	DueDate     string        `json:"dueDate,omitempty"`
 	ApprovedAt  string        `json:"approvedAt,omitempty"`
 	CreatedAt   string        `json:"createdAt,omitempty"`
-	User        ApprovalUser  `json:"user,omitempty"`
-	RequestedBy ApprovalUser  `json:"requestedBy,omitempty"`
+	User        *ApprovalUser `json:"user,omitempty"`
+	RequestedBy *ApprovalUser `json:"requestedBy,omitempty"`
 }
 
 // ApprovalRequestInput is a single approval request for a post.

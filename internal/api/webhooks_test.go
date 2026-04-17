@@ -43,7 +43,15 @@ func TestWebhookService_CRUD(t *testing.T) {
 	if _, err := svc.Update("w1", map[string]interface{}{"name": "updated"}); err != nil {
 		t.Fatalf("update: %v", err)
 	}
-	if err := svc.Delete("w1"); err != nil {
+	data, err := svc.Delete("w1")
+	if err != nil {
 		t.Fatalf("delete: %v", err)
+	}
+	var ack map[string]bool
+	if err := json.Unmarshal(data, &ack); err != nil {
+		t.Fatalf("parse delete body: %v", err)
+	}
+	if !ack["success"] {
+		t.Errorf("expected real API body with success=true; got %v", ack)
 	}
 }

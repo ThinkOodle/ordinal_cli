@@ -41,10 +41,12 @@ func (s *ApprovalService) Create(req models.CreateApprovalsRequest) (json.RawMes
 	return data, nil
 }
 
-// Delete deletes an approval by ID.
-func (s *ApprovalService) Delete(id string) error {
-	if _, err := s.client.Delete("/approvals/" + id); err != nil {
-		return fmt.Errorf("deleting approval: %w", err)
+// Delete deletes an approval by ID. The API returns a
+// `{"deletedApproval": Approval}` envelope; we forward it verbatim.
+func (s *ApprovalService) Delete(id string) (json.RawMessage, error) {
+	data, err := s.client.Delete("/approvals/" + id)
+	if err != nil {
+		return nil, fmt.Errorf("deleting approval: %w", err)
 	}
-	return nil
+	return data, nil
 }

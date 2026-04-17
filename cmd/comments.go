@@ -75,9 +75,10 @@ var commentDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := api.NewCommentService(c).Delete(commentID); err != nil {
+		data, err := api.NewCommentService(c).Delete(commentID)
+		if err != nil {
 			return err
 		}
-		return printResult(deletedAck("comment", commentID))
+		return printMutationAck(data)
 	},
 }

@@ -50,10 +50,13 @@ func (s *InviteService) Create(req models.CreateInviteRequest) (*models.CreateIn
 	return &resp, nil
 }
 
-// Delete deletes an invite by ID.
-func (s *InviteService) Delete(id string) error {
-	if _, err := s.client.Delete(invitesBasePath + "/" + id); err != nil {
-		return fmt.Errorf("deleting invite: %w", err)
+// Delete deletes an invite by ID. Returns the raw API response body
+// (currently `{"deleted": true}`) so the caller can format it through the
+// standard output pipeline instead of a locally-synthesized acknowledgement.
+func (s *InviteService) Delete(id string) (json.RawMessage, error) {
+	data, err := s.client.Delete(invitesBasePath + "/" + id)
+	if err != nil {
+		return nil, fmt.Errorf("deleting invite: %w", err)
 	}
-	return nil
+	return data, nil
 }

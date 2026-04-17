@@ -10,29 +10,29 @@ import (
 )
 
 var (
-	ideaID                      string
-	ideaListLimit               int
-	ideaListCursor              string
-	ideaListIDs                 string
-	ideaListChannel             string
-	ideaListLinkedInProfileID   string
-	ideaListXProfileID          string
-	ideaListLabelIDs            string
-	ideaListCreatedAtMin        string
-	ideaListCreatedAtMax        string
-	ideaListSortBy              string
-	ideaListSortOrder           string
-	ideaListAll                 bool
-	ideaCreateTitle             string
-	ideaCreateLabelIDs          string
-	ideaCreateCampaignID        string
-	ideaCreateBodyJSON          string
-	ideaCreateBodyFile          string
-	ideaUpdateTitle             string
-	ideaUpdateLabelIDs          string
-	ideaUpdateCampaignID        string
-	ideaUpdateBodyJSON          string
-	ideaUpdateBodyFile          string
+	ideaID                       string
+	ideaListLimit                int
+	ideaListCursor               string
+	ideaListIDs                  string
+	ideaListChannel              string
+	ideaListLinkedInProfileID    string
+	ideaListXProfileID           string
+	ideaListLabelIDs             string
+	ideaListCreatedAtMin         string
+	ideaListCreatedAtMax         string
+	ideaListSortBy               string
+	ideaListSortOrder            string
+	ideaListAll                  bool
+	ideaCreateTitle              string
+	ideaCreateLabelIDs           string
+	ideaCreateCampaignID         string
+	ideaCreateBodyJSON           string
+	ideaCreateBodyFile           string
+	ideaUpdateTitle              string
+	ideaUpdateLabelIDs           string
+	ideaUpdateCampaignID         string
+	ideaUpdateBodyJSON           string
+	ideaUpdateBodyFile           string
 	ideaAddToCalendarPublishDate string
 )
 

@@ -88,9 +88,10 @@ var subscriberDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := api.NewSubscriberService(c).Delete(subscriberID); err != nil {
+		data, err := api.NewSubscriberService(c).Delete(subscriberID)
+		if err != nil {
 			return err
 		}
-		return printResult(deletedAck("subscriber", subscriberID))
+		return printMutationAck(data)
 	},
 }

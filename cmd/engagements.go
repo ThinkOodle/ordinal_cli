@@ -143,9 +143,10 @@ var engagementDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := api.NewEngagementService(c).Delete(engagementID); err != nil {
+		data, err := api.NewEngagementService(c).Delete(engagementID)
+		if err != nil {
 			return err
 		}
-		return printResult(deletedAck("engagement", engagementID))
+		return printMutationAck(data)
 	},
 }

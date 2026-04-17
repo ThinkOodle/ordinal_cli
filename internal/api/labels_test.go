@@ -62,10 +62,21 @@ func TestLabelService_Delete(t *testing.T) {
 		if r.URL.Path != "/labels/lbl-1" {
 			t.Errorf("expected /labels/lbl-1, got %s", r.URL.Path)
 		}
-		return jsonResponse(t, http.StatusOK, map[string]bool{"success": true}), nil
+		// /labels/{id} DELETE returns the deleted Label per the OpenAPI
+		// spec; the CLI must forward that body unchanged rather than
+		// fabricating an acknowledgement.
+		return jsonResponse(t, http.StatusOK, models.Label{ID: "lbl-1", Name: "Thought", Color: "purple"}), nil
 	}))
 
-	if err := svc.Delete("lbl-1"); err != nil {
+	data, err := svc.Delete("lbl-1")
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	var got models.Label
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("parse delete body: %v", err)
+	}
+	if got.ID != "lbl-1" {
+		t.Errorf("expected delete body to carry the label; got %+v", got)
 	}
 }

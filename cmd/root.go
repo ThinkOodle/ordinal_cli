@@ -186,18 +186,6 @@ func printResult(data interface{}) error {
 	return nil
 }
 
-// deletedAck is the structured acknowledgement returned by delete subcommands
-// so their output flows through printResult rather than raw fmt.Printf. This
-// keeps --output json and --output csv machine-readable — a plain "X deleted"
-// line would corrupt both.
-func deletedAck(resource, id string) map[string]interface{} {
-	return map[string]interface{}{
-		"resource": resource,
-		"id":       id,
-		"deleted":  true,
-	}
-}
-
 // splitCSV splits a comma-separated flag value and trims each entry.
 // Returns nil if the input is empty.
 func splitCSV(s string) []string {

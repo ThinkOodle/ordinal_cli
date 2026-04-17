@@ -76,9 +76,10 @@ var labelDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := api.NewLabelService(c).Delete(labelID); err != nil {
+		data, err := api.NewLabelService(c).Delete(labelID)
+		if err != nil {
 			return err
 		}
-		return printResult(deletedAck("label", labelID))
+		return printMutationAck(data)
 	},
 }

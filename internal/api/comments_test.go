@@ -56,10 +56,19 @@ func TestCommentService_Delete(t *testing.T) {
 		if r.Method != http.MethodDelete {
 			t.Errorf("expected DELETE, got %s", r.Method)
 		}
-		return jsonResponse(t, http.StatusOK, map[string]bool{"success": true}), nil
+		// /comments/{id} DELETE returns the deleted Comment.
+		return jsonResponse(t, http.StatusOK, models.Comment{ID: "c1", Message: "deleted"}), nil
 	}))
 
-	if err := svc.Delete("c1"); err != nil {
+	data, err := svc.Delete("c1")
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	var got models.Comment
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("parse delete body: %v", err)
+	}
+	if got.ID != "c1" {
+		t.Errorf("expected real comment body to be forwarded; got %+v", got)
 	}
 }
