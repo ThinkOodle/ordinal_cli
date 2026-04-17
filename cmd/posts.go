@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
@@ -211,14 +212,16 @@ var postCreateCmd = &cobra.Command{
 		// Validate required fields before authenticating / dialing the API.
 		// The Ordinal API rejects posts missing any of these, and surfacing
 		// the error locally gives a more actionable message without
-		// consuming a rate-limit slot.
+		// consuming a rate-limit slot. Use a typed check so null, non-string,
+		// and whitespace-only values fail locally too.
 		for _, field := range []struct{ key, flag string }{
 			{"title", "title"},
 			{"publishAt", "publish-at"},
 			{"status", "status"},
 		} {
-			if v, ok := body[field.key]; !ok || v == "" {
-				return fmt.Errorf("--%s or a %q field in --body-json/--body-file is required", field.flag, field.key)
+			s, ok := body[field.key].(string)
+			if !ok || strings.TrimSpace(s) == "" {
+				return fmt.Errorf("--%s or a non-empty %q field in --body-json/--body-file is required", field.flag, field.key)
 			}
 		}
 		c, err := newClient()

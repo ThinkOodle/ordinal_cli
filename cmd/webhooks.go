@@ -143,8 +143,8 @@ var webhookUpdateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if body == nil {
-			return fmt.Errorf("provide --body-json or --body-file")
+		if len(body) == 0 {
+			return fmt.Errorf("no fields to update; provide --body-json or --body-file")
 		}
 		w, err := api.NewWebhookService(c).Update(webhookID, body)
 		if err != nil {

@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/ordinal-cli/ordinal/internal/api"
 	"github.com/ordinal-cli/ordinal/internal/models"
 	"github.com/spf13/cobra"
@@ -49,6 +52,11 @@ var inviteCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create an invite",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// MarkFlagRequired only checks presence; --email "" or whitespace
+		// would otherwise reach the API and fail with a less-actionable error.
+		if strings.TrimSpace(inviteCreateEmail) == "" {
+			return fmt.Errorf("--email must not be empty")
+		}
 		c, err := newClient()
 		if err != nil {
 			return err

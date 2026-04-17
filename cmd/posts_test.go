@@ -24,6 +24,14 @@ func TestPostCreate_RequiresTitlePublishAtStatus(t *testing.T) {
 		{"empty body", `{}`, "title"},
 		{"only title", `{"title":"hi"}`, "publishAt"},
 		{"title and publishAt", `{"title":"hi","publishAt":"2026-01-01T00:00:00Z"}`, "status"},
+		// Typed-check regression cases: the pre-fix guard treated null,
+		// whitespace-only, and non-string values as valid, sending them to
+		// the API instead of failing locally.
+		{"null title", `{"title":null,"publishAt":"2026-01-01T00:00:00Z","status":"ToDo"}`, "title"},
+		{"whitespace title", `{"title":"   ","publishAt":"2026-01-01T00:00:00Z","status":"ToDo"}`, "title"},
+		{"numeric status", `{"title":"hi","publishAt":"2026-01-01T00:00:00Z","status":1}`, "status"},
+		{"null publishAt", `{"title":"hi","publishAt":null,"status":"ToDo"}`, "publishAt"},
+		{"all null", `{"title":null,"publishAt":null,"status":null}`, "title"},
 	}
 
 	for _, tc := range tests {

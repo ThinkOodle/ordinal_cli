@@ -94,6 +94,12 @@ var engagementCreateCmd = &cobra.Command{
 		if err := json.Unmarshal(raw, &engagements); err != nil {
 			return fmt.Errorf("parsing engagements array: %w", err)
 		}
+		// Parity with subscriber/webhook create: a presence-only check on the
+		// body flag lets [] through and sends an empty array to the API,
+		// which wastes a round-trip for an obviously-invalid request.
+		if len(engagements) == 0 {
+			return fmt.Errorf("engagements array must contain at least one engagement")
+		}
 
 		req := models.CreateEngagementsRequest{
 			Channel:     engagementCreateChannel,
@@ -119,8 +125,8 @@ var engagementUpdateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if body == nil {
-			return fmt.Errorf("provide --body-json or --body-file")
+		if len(body) == 0 {
+			return fmt.Errorf("no fields to update; provide --body-json or --body-file")
 		}
 		data, err := api.NewEngagementService(c).Update(engagementID, body)
 		if err != nil {
