@@ -12,13 +12,22 @@ func TestIdeaService_List(t *testing.T) {
 		if r.URL.Path != "/ideas" {
 			t.Errorf("expected /ideas, got %s", r.URL.Path)
 		}
+		if r.URL.Query().Get("tikTokProfileId") != "tt-1" {
+			t.Errorf("expected tikTokProfileId=tt-1, got %s", r.URL.Query().Get("tikTokProfileId"))
+		}
+		if r.URL.Query().Get("youTubeProfileId") != "yt-1" {
+			t.Errorf("expected youTubeProfileId=yt-1, got %s", r.URL.Query().Get("youTubeProfileId"))
+		}
 		return jsonResponse(t, http.StatusOK, models.IdeaListResponse{
 			Ideas:   []models.Idea{{ID: "i1", Title: "I1"}},
 			HasMore: false,
 		}), nil
 	}))
 
-	resp, err := svc.List(models.ListIdeasParams{})
+	resp, err := svc.List(models.ListIdeasParams{
+		TikTokProfileID:  "tt-1",
+		YouTubeProfileID: "yt-1",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

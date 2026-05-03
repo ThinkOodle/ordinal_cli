@@ -17,6 +17,8 @@ var (
 	ideaListChannel              string
 	ideaListLinkedInProfileID    string
 	ideaListXProfileID           string
+	ideaListTikTokProfileID      string
+	ideaListYouTubeProfileID     string
 	ideaListLabelIDs             string
 	ideaListCreatedAtMin         string
 	ideaListCreatedAtMax         string
@@ -26,11 +28,13 @@ var (
 	ideaCreateTitle              string
 	ideaCreateLabelIDs           string
 	ideaCreateCampaignID         string
+	ideaCreateNotes              string
 	ideaCreateBodyJSON           string
 	ideaCreateBodyFile           string
 	ideaUpdateTitle              string
 	ideaUpdateLabelIDs           string
 	ideaUpdateCampaignID         string
+	ideaUpdateNotes              string
 	ideaUpdateBodyJSON           string
 	ideaUpdateBodyFile           string
 	ideaAddToCalendarPublishDate string
@@ -52,6 +56,8 @@ func init() {
 	ideaListCmd.Flags().StringVar(&ideaListChannel, "channel", "", "Filter by channel")
 	ideaListCmd.Flags().StringVar(&ideaListLinkedInProfileID, "linkedin-profile-id", "", "Filter by LinkedIn profile ID")
 	ideaListCmd.Flags().StringVar(&ideaListXProfileID, "x-profile-id", "", "Filter by X/Twitter profile ID")
+	ideaListCmd.Flags().StringVar(&ideaListTikTokProfileID, "tiktok-profile-id", "", "Filter by TikTok profile ID")
+	ideaListCmd.Flags().StringVar(&ideaListYouTubeProfileID, "youtube-profile-id", "", "Filter by YouTube channel profile ID")
 	ideaListCmd.Flags().StringVar(&ideaListLabelIDs, "label-ids", "", "Filter by label IDs (comma-separated)")
 	ideaListCmd.Flags().StringVar(&ideaListCreatedAtMin, "created-at-min", "", "Filter ideas created on or after this date")
 	ideaListCmd.Flags().StringVar(&ideaListCreatedAtMax, "created-at-max", "", "Filter ideas created on or before this date")
@@ -65,6 +71,7 @@ func init() {
 	ideaCreateCmd.Flags().StringVar(&ideaCreateTitle, "title", "", "Idea title")
 	ideaCreateCmd.Flags().StringVar(&ideaCreateLabelIDs, "label-ids", "", "Comma-separated label IDs")
 	ideaCreateCmd.Flags().StringVar(&ideaCreateCampaignID, "campaign-id", "", "Campaign ID")
+	ideaCreateCmd.Flags().StringVar(&ideaCreateNotes, "notes", "", "Internal notes")
 	ideaCreateCmd.Flags().StringVar(&ideaCreateBodyJSON, "body-json", "", "Full JSON body including channel configs (individual flags override matching keys)")
 	ideaCreateCmd.Flags().StringVar(&ideaCreateBodyFile, "body-file", "", "Path to JSON body file (or - for stdin)")
 
@@ -72,6 +79,7 @@ func init() {
 	ideaUpdateCmd.Flags().StringVar(&ideaUpdateTitle, "title", "", "Idea title")
 	ideaUpdateCmd.Flags().StringVar(&ideaUpdateLabelIDs, "label-ids", "", "Comma-separated label IDs")
 	ideaUpdateCmd.Flags().StringVar(&ideaUpdateCampaignID, "campaign-id", "", "Campaign ID")
+	ideaUpdateCmd.Flags().StringVar(&ideaUpdateNotes, "notes", "", "Internal notes")
 	ideaUpdateCmd.Flags().StringVar(&ideaUpdateBodyJSON, "body-json", "", "Full JSON body (individual flags override matching keys when set)")
 	ideaUpdateCmd.Flags().StringVar(&ideaUpdateBodyFile, "body-file", "", "Path to JSON body file (or - for stdin)")
 	ideaUpdateCmd.MarkFlagRequired("id")
@@ -90,6 +98,7 @@ func init() {
 var ideaCmd = &cobra.Command{
 	Use:   "idea",
 	Short: "Manage content ideas",
+	Long:  "Create, list, update, archive, and schedule ideas across LinkedIn, X, TikTok, and YouTube Shorts channels.",
 }
 
 var ideaListCmd = &cobra.Command{
@@ -119,6 +128,8 @@ var ideaListCmd = &cobra.Command{
 			Channel:           ideaListChannel,
 			LinkedInProfileID: ideaListLinkedInProfileID,
 			XProfileID:        ideaListXProfileID,
+			TikTokProfileID:   ideaListTikTokProfileID,
+			YouTubeProfileID:  ideaListYouTubeProfileID,
 			LabelIDs:          normalizeCSV(ideaListLabelIDs),
 			CreatedAtMin:      ideaListCreatedAtMin,
 			CreatedAtMax:      ideaListCreatedAtMax,
@@ -177,6 +188,9 @@ var ideaCreateCmd = &cobra.Command{
 		if ideaCreateCampaignID != "" {
 			body["campaignId"] = ideaCreateCampaignID
 		}
+		if ideaCreateNotes != "" {
+			body["notes"] = ideaCreateNotes
+		}
 		// Validate before newClient() so a missing/blank title surfaces
 		// ahead of an unrelated auth error, and so {"title":null} or
 		// {"title":"   "} fail locally instead of wasting an API call.
@@ -226,6 +240,9 @@ var ideaUpdateCmd = &cobra.Command{
 		}
 		if cmd.Flags().Changed("campaign-id") {
 			body["campaignId"] = ideaUpdateCampaignID
+		}
+		if cmd.Flags().Changed("notes") {
+			body["notes"] = ideaUpdateNotes
 		}
 		if len(body) == 0 {
 			return fmt.Errorf("no fields to update; provide flags or --body-json/--body-file")

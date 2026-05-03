@@ -42,7 +42,6 @@ ordinal post get --id <uuid>
 ordinal post create --body-file ./post.json
 ordinal post schedule --id <uuid> --publish-at 2026-05-01T10:00:00Z
 ordinal post archive --id <uuid>
-ordinal post delete --id <uuid>
 
 # Ideas
 ordinal idea list --limit 50
@@ -108,12 +107,16 @@ The `post list` and `idea list` commands use Ordinal's cursor pagination:
 
 ### Body-Driven Flags
 
-Posts and ideas have deeply-nested channel-specific content (LinkedIn, X, Instagram). Those commands accept inline or file-based JSON bodies:
+Posts and ideas have deeply-nested channel-specific content. Those commands accept inline or file-based JSON bodies:
 
 - `--body-json '<json>'` — Inline JSON
 - `--body-file <path>` — Path to a JSON file, or `-` to read from stdin
 
 Individual top-level flags (`--title`, `--publish-at`, `--status`, etc.) merge into the body when provided.
+
+Post channel body keys are `linkedIn`, `x`, `instagram`, `tikTok`, and `youTubeShorts`. Idea channel body keys are `linkedIn`, `x`, `tikTok`, and `youTubeShorts`.
+
+Channel attachments use `assets` arrays with asset reference objects, for example `{"assets":[{"assetId":"<upload-asset-uuid>"}]}`. Do not use the old `assetIds` array shape. Instagram asset objects may also include `tags`; TikTok and YouTube Shorts each require exactly one video asset object.
 
 ## Supported Resources
 

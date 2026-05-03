@@ -19,6 +19,12 @@ func TestPostService_List(t *testing.T) {
 		if r.URL.Query().Get("status") != "Scheduled" {
 			t.Errorf("expected status=Scheduled, got %s", r.URL.Query().Get("status"))
 		}
+		if r.URL.Query().Get("tikTokProfileId") != "tt-1" {
+			t.Errorf("expected tikTokProfileId=tt-1, got %s", r.URL.Query().Get("tikTokProfileId"))
+		}
+		if r.URL.Query().Get("youTubeProfileId") != "yt-1" {
+			t.Errorf("expected youTubeProfileId=yt-1, got %s", r.URL.Query().Get("youTubeProfileId"))
+		}
 		return jsonResponse(t, http.StatusOK, models.PostListResponse{
 			Posts:      []models.Post{{ID: "p1", Title: "t1", Status: "Scheduled"}},
 			NextCursor: "cursor-2",
@@ -26,7 +32,12 @@ func TestPostService_List(t *testing.T) {
 		}), nil
 	}))
 
-	resp, err := svc.List(models.ListPostsParams{Limit: 10, Status: "Scheduled"})
+	resp, err := svc.List(models.ListPostsParams{
+		Limit:            10,
+		Status:           "Scheduled",
+		TikTokProfileID:  "tt-1",
+		YouTubeProfileID: "yt-1",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -205,24 +216,6 @@ func TestPostService_ListAll_TwoCursorCycle(t *testing.T) {
 	// Calls: 1 -> next=B (seen), 2 -> next=A (seen), 3 -> next=B (repeat).
 	if calls != 3 {
 		t.Errorf("expected 3 calls before detecting cycle, got %d", calls)
-	}
-}
-
-func TestPostService_Delete(t *testing.T) {
-	var method string
-	svc := NewPostService(newTestClient(func(r *http.Request) (*http.Response, error) {
-		method = r.Method
-		if r.URL.Path != "/posts/abc" {
-			t.Errorf("expected /posts/abc, got %s", r.URL.Path)
-		}
-		return jsonResponse(t, http.StatusOK, map[string]string{"id": "abc"}), nil
-	}))
-
-	if _, err := svc.Delete("abc"); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if method != http.MethodDelete {
-		t.Errorf("expected DELETE, got %s", method)
 	}
 }
 

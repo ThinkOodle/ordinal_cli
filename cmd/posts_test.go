@@ -148,6 +148,71 @@ func TestPostUpdate_ClearsLabelsWithEmptyFlag(t *testing.T) {
 	}
 }
 
+// TestPostCreate_PreservesCurrentAssetObjectShape guards the current API
+// request shape for channel assets. The OpenAPI schema now uses
+// assets:[{assetId:"..."}], not the older assetIds:["..."] shorthand. The
+// CLI must pass this nested JSON through exactly as supplied.
+func TestPostCreate_PreservesCurrentAssetObjectShape(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ORDINAL_API_KEY", "test-key")
+	t.Setenv("ORDINAL_OUTPUT_FORMAT", "")
+	t.Setenv("ORDINAL_VERBOSE", "")
+
+	var captured []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"p-1"}`))
+	}))
+	defer server.Close()
+
+	prev := testClientOpts
+	testClientOpts = []client.Option{
+		client.WithBaseURL(server.URL),
+		client.WithHTTPClient(server.Client()),
+	}
+	defer func() { testClientOpts = prev }()
+
+	resetPostCreateFlags(t)
+	bodyJSON := `{
+		"title":"Launch",
+		"publishAt":"2026-01-15T14:00:00Z",
+		"status":"Scheduled",
+		"linkedIn":{"profileId":"li-1","copy":"hello","assets":[{"assetId":"asset-li"}]},
+		"x":{"profileId":"x-1","tweets":[{"copy":"hello","assets":[{"assetId":"asset-x"}]}]},
+		"instagram":{"profileId":"ig-1","type":"Feed","copy":"hello","assets":[{"assetId":"asset-ig","tags":[{"username":"tryordinal","x":0.5,"y":0.5}]}]},
+		"tikTok":{"profileId":"tt-1","copy":"hello","assets":[{"assetId":"asset-tt"}]},
+		"youTubeShorts":{"profileId":"yt-1","title":"hello","assets":[{"assetId":"asset-yt"}]}
+	}`
+
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetErr(&buf)
+	rootCmd.SetArgs([]string{"post", "create", "--body-json", bodyJSON})
+
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("post create: %v", err)
+	}
+
+	body := string(captured)
+	if strings.Contains(body, `"assetIds"`) {
+		t.Fatalf("post body must not use old assetIds shape: %s", body)
+	}
+	for _, want := range []string{
+		`"assets":[{"assetId":"asset-li"}]`,
+		`"assets":[{"assetId":"asset-x"}]`,
+		`"assetId":"asset-ig"`,
+		`"tags":[{"username":"tryordinal","x":0.5,"y":0.5}]`,
+		`"assets":[{"assetId":"asset-tt"}]`,
+		`"assets":[{"assetId":"asset-yt"}]`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected body to contain %s; got %s", want, body)
+		}
+	}
+}
+
 // TestPostUpdate_NoOpValidatesBeforeAuth locks in the ordering: when no
 // fields are provided, the local "no fields to update" error must surface
 // ahead of newClient()'s auth error. Otherwise a user mistyping the command

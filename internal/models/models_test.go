@@ -57,3 +57,51 @@ func TestOptionalNestedObjects_PreservedWhenSet(t *testing.T) {
 		t.Errorf("expected user block; got %s", got)
 	}
 }
+
+// Post and idea responses carry nested, channel-specific payloads. The CLI
+// keeps those as raw JSON so new channel schemas are not lost while formatting
+// typed responses.
+func TestChannelRawMessages_PreserveNewChannels(t *testing.T) {
+	postJSON := []byte(`{
+		"id":"p_1",
+		"title":"Post",
+		"status":"Scheduled",
+		"tikTok":{"copy":"caption"},
+		"youTubeShorts":{"title":"short"}
+	}`)
+	var post Post
+	if err := json.Unmarshal(postJSON, &post); err != nil {
+		t.Fatalf("unmarshal post: %v", err)
+	}
+	encodedPost, err := json.Marshal(post)
+	if err != nil {
+		t.Fatalf("marshal post: %v", err)
+	}
+	gotPost := string(encodedPost)
+	for _, want := range []string{`"tikTok":{"copy":"caption"}`, `"youTubeShorts":{"title":"short"}`} {
+		if !strings.Contains(gotPost, want) {
+			t.Errorf("expected post output to preserve %s; got %s", want, gotPost)
+		}
+	}
+
+	ideaJSON := []byte(`{
+		"id":"i_1",
+		"title":"Idea",
+		"tikTok":{"copy":"caption"},
+		"youTubeShorts":{"title":"short"}
+	}`)
+	var idea Idea
+	if err := json.Unmarshal(ideaJSON, &idea); err != nil {
+		t.Fatalf("unmarshal idea: %v", err)
+	}
+	encodedIdea, err := json.Marshal(idea)
+	if err != nil {
+		t.Fatalf("marshal idea: %v", err)
+	}
+	gotIdea := string(encodedIdea)
+	for _, want := range []string{`"tikTok":{"copy":"caption"}`, `"youTubeShorts":{"title":"short"}`} {
+		if !strings.Contains(gotIdea, want) {
+			t.Errorf("expected idea output to preserve %s; got %s", want, gotIdea)
+		}
+	}
+}

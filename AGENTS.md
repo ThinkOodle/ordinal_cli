@@ -151,12 +151,14 @@ The `post list` and `idea list` commands use cursor-based pagination:
 
 ### JSON Body Flags
 
-Post and idea creation accept nested channel-specific content (LinkedIn, X, Instagram). Those commands accept:
+Post creation accepts nested channel-specific content for LinkedIn, X, Instagram, TikTok, and YouTube Shorts. Idea creation accepts nested channel-specific content for LinkedIn, X, TikTok, and YouTube Shorts. Those commands accept:
 
 - `--body-json '<inline JSON>'`
 - `--body-file <path>` (or `-` to read stdin)
 
 Individual top-level flags (`--title`, `--publish-at`, `--status`, etc.) merge into the body when provided.
+
+Channel assets use `assets` arrays of objects, for example `{"assets":[{"assetId":"<upload-asset-uuid>"}]}`. Do not use the old `assetIds` array shape. Instagram asset objects can also include `tags`; TikTok and YouTube Shorts require exactly one video asset object.
 
 Some other commands (webhook update, engagement create/update, approval create, analytics cpm-update, slack-boost update) also expose `--body-json` / `--body-file` for arbitrary partial bodies.
 

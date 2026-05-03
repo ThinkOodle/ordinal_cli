@@ -42,6 +42,12 @@ func (s *IdeaService) List(params models.ListIdeasParams) (*models.IdeaListRespo
 	if params.XProfileID != "" {
 		q.Set("xProfileId", params.XProfileID)
 	}
+	if params.TikTokProfileID != "" {
+		q.Set("tikTokProfileId", params.TikTokProfileID)
+	}
+	if params.YouTubeProfileID != "" {
+		q.Set("youTubeProfileId", params.YouTubeProfileID)
+	}
 	if params.LabelIDs != "" {
 		q.Set("labelIds", params.LabelIDs)
 	}

@@ -116,6 +116,7 @@ func resetIdeaCreateFlags(t *testing.T) {
 	ideaCreateTitle = ""
 	ideaCreateLabelIDs = ""
 	ideaCreateCampaignID = ""
+	ideaCreateNotes = ""
 	ideaCreateBodyJSON = ""
 	ideaCreateBodyFile = ""
 }
@@ -215,6 +216,7 @@ func resetIdeaUpdateFlags(t *testing.T) {
 	ideaUpdateTitle = ""
 	ideaUpdateLabelIDs = ""
 	ideaUpdateCampaignID = ""
+	ideaUpdateNotes = ""
 	ideaUpdateBodyJSON = ""
 	ideaUpdateBodyFile = ""
 	ideaUpdateCmd.Flags().VisitAll(func(f *pflag.Flag) {

@@ -6,7 +6,8 @@ description: |
   output formats, pagination, JSON-heavy flags, supported resources, and safe
   command patterns for posts, ideas, approvals, comments, engagements,
   subscribers, labels, analytics, webhooks, Slack boosts, and related
-  Ordinal workspace operations.
+  Ordinal workspace operations, including current post channels such as
+  Instagram, TikTok, and YouTube Shorts.
 invocable: true
 argument-hint: "[resource] [action] [flags]"
 ---
@@ -114,7 +115,7 @@ ordinal <resource> delete --id <uuid>
 
 Notable exceptions:
 
-- `post` has extra actions: `schedule`, `unschedule`, `archive`, `unarchive`.
+- `post` has extra actions: `schedule`, `unschedule`, `archive`, `unarchive`; current API docs do not expose post delete.
 - `idea` has extra actions: `archive`, `unarchive`, `add-to-calendar`.
 - Some resources (comments, approvals, engagements, subscribers, inline-comments, slack-boost) are scoped by a parent post ID via `--post-id`.
 - `profile` has two list actions: `list-scheduling` and `list-engagement`.
@@ -174,7 +175,7 @@ ordinal idea list --all --output json
 
 ## JSON-Heavy Flags
 
-Post and idea creation support multi-channel content (LinkedIn, X, Instagram). These use nested objects that are hard to express purely as flags, so those commands accept `--body-json` (inline JSON) or `--body-file` (path to a JSON file, `-` for stdin) for the channel configs.
+Post and idea creation support multi-channel content. These use nested objects that are hard to express purely as flags, so those commands accept `--body-json` (inline JSON) or `--body-file` (path to a JSON file, `-` for stdin) for the channel configs.
 
 Common JSON-driven patterns:
 
@@ -189,6 +190,20 @@ Do not invent body shapes. Use the official docs and command help to confirm the
 
 - Post / idea channel configs: see `POST /posts` and `POST /ideas` in the OpenAPI spec.
 - Engagement inputs: see `EngagementInput` schema.
+
+Current channel body keys:
+
+- Posts: `linkedIn`, `x`, `instagram`, `tikTok`, `youTubeShorts`
+- Ideas: `linkedIn`, `x`, `tikTok`, `youTubeShorts`
+
+Current channel asset shape:
+
+- Use `assets` arrays of objects, for example `{"assets":[{"assetId":"<upload-asset-uuid>"}]}`.
+- Do not use the old `assetIds` array shape.
+- Instagram asset objects may also include `tags`, for example `{"assetId":"<uuid>","tags":[{"username":"tryordinal","x":0.5,"y":0.5}]}`.
+- TikTok and YouTube Shorts each require exactly one video asset object in `assets`.
+
+Current post list profile filters include `--linkedin-profile-id`, `--x-profile-id`, `--instagram-profile-id`, `--tiktok-profile-id`, and `--youtube-profile-id`. Current idea list profile filters include `--linkedin-profile-id`, `--x-profile-id`, `--tiktok-profile-id`, and `--youtube-profile-id`.
 
 Use single quotes around JSON on Unix-like shells:
 
@@ -224,8 +239,9 @@ ordinal post unarchive --id <post-uuid>
 
 Notes:
 
-- Posts require at least one channel (`linkedIn`, `x`, or `instagram`) in the body.
+- Posts require at least one channel (`linkedIn`, `x`, `instagram`, `tikTok`, or `youTubeShorts`) in the body.
 - `publishAt` is UTC ISO 8601.
+- Use `archive` rather than delete; post deletion is not part of the current public API surface.
 
 ### Ideas
 

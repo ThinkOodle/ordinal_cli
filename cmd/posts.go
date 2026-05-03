@@ -19,6 +19,8 @@ var (
 	postListLinkedInProfileID  string
 	postListXProfileID         string
 	postListInstagramProfileID string
+	postListTikTokProfileID    string
+	postListYouTubeProfileID   string
 	postListLabelIDs           string
 	postListPublishDateMin     string
 	postListPublishDateMax     string
@@ -56,7 +58,6 @@ func init() {
 	postCmd.AddCommand(postUnarchiveCmd)
 	postCmd.AddCommand(postScheduleCmd)
 	postCmd.AddCommand(postUnscheduleCmd)
-	postCmd.AddCommand(postDeleteCmd)
 
 	postListCmd.Flags().IntVar(&postListLimit, "limit", 0, "Max posts to return (1-100)")
 	postListCmd.Flags().StringVar(&postListCursor, "cursor", "", "Pagination cursor from a prior response")
@@ -66,6 +67,8 @@ func init() {
 	postListCmd.Flags().StringVar(&postListLinkedInProfileID, "linkedin-profile-id", "", "Filter by LinkedIn profile ID")
 	postListCmd.Flags().StringVar(&postListXProfileID, "x-profile-id", "", "Filter by X/Twitter profile ID")
 	postListCmd.Flags().StringVar(&postListInstagramProfileID, "instagram-profile-id", "", "Filter by Instagram profile ID")
+	postListCmd.Flags().StringVar(&postListTikTokProfileID, "tiktok-profile-id", "", "Filter by TikTok profile ID")
+	postListCmd.Flags().StringVar(&postListYouTubeProfileID, "youtube-profile-id", "", "Filter by YouTube channel profile ID")
 	postListCmd.Flags().StringVar(&postListLabelIDs, "label-ids", "", "Filter by label IDs (comma-separated)")
 	postListCmd.Flags().StringVar(&postListPublishDateMin, "publish-date-min", "", "Filter posts scheduled on or after this date")
 	postListCmd.Flags().StringVar(&postListPublishDateMax, "publish-date-max", "", "Filter posts scheduled on or before this date")
@@ -80,7 +83,7 @@ func init() {
 
 	postCreateCmd.Flags().StringVar(&postCreateTitle, "title", "", "Post title")
 	postCreateCmd.Flags().StringVar(&postCreatePublishAt, "publish-at", "", "Publish datetime UTC (ISO 8601)")
-	postCreateCmd.Flags().StringVar(&postCreateStatus, "status", "", "Post status (Tentative, ToDo, InProgress, ForReview, Blocked, Finalized, Scheduled)")
+	postCreateCmd.Flags().StringVar(&postCreateStatus, "status", "", "Post status (Tentative, ToDo, InProgress, ForReview, Blocked, Finalized, Scheduled, Posted)")
 	postCreateCmd.Flags().StringVar(&postCreateLabelIDs, "label-ids", "", "Comma-separated label IDs")
 	postCreateCmd.Flags().StringVar(&postCreateCampaignID, "campaign-id", "", "Campaign ID")
 	postCreateCmd.Flags().StringVar(&postCreateNotes, "notes", "", "Post notes")
@@ -109,15 +112,12 @@ func init() {
 
 	postUnscheduleCmd.Flags().StringVar(&postID, "id", "", "Post ID (UUID)")
 	postUnscheduleCmd.MarkFlagRequired("id")
-
-	postDeleteCmd.Flags().StringVar(&postID, "id", "", "Post ID (UUID)")
-	postDeleteCmd.MarkFlagRequired("id")
 }
 
 var postCmd = &cobra.Command{
 	Use:   "post",
 	Short: "Manage posts",
-	Long:  "Create, list, update, schedule, archive, and retrieve posts across LinkedIn, X, and Instagram channels.",
+	Long:  "Create, list, update, schedule, archive, and retrieve posts across LinkedIn, X, Instagram, TikTok, and YouTube Shorts channels.",
 }
 
 var postListCmd = &cobra.Command{
@@ -149,6 +149,8 @@ var postListCmd = &cobra.Command{
 			LinkedInProfileID:  postListLinkedInProfileID,
 			XProfileID:         postListXProfileID,
 			InstagramProfileID: postListInstagramProfileID,
+			TikTokProfileID:    postListTikTokProfileID,
+			YouTubeProfileID:   postListYouTubeProfileID,
 			LabelIDs:           normalizeCSV(postListLabelIDs),
 			PublishDateMin:     postListPublishDateMin,
 			PublishDateMax:     postListPublishDateMax,
@@ -192,7 +194,7 @@ var postGetCmd = &cobra.Command{
 var postCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a post",
-	Long:  "Create a post. Use --body-json or --body-file to pass the full request including nested linkedIn/x/instagram channel configs. Individual flags override matching top-level keys in the body when provided.",
+	Long:  "Create a post. Use --body-json or --body-file to pass the full request including nested linkedIn/x/instagram/tikTok/youTubeShorts channel configs. Individual flags override matching top-level keys in the body when provided.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		body, err := parseBodyJSON(postCreateBodyJSON, postCreateBodyFile)
 		if err != nil {
@@ -358,23 +360,6 @@ var postUnscheduleCmd = &cobra.Command{
 			return err
 		}
 		data, err := api.NewPostService(c).Unschedule(postID)
-		if err != nil {
-			return err
-		}
-		return printMutationAck(data)
-	},
-}
-
-var postDeleteCmd = &cobra.Command{
-	Use:   "delete",
-	Short: "Permanently delete a post",
-	Long:  "Permanently delete a post by ID. Prefer 'archive' for a 30-day recovery window; 'delete' is irreversible.",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := newClient()
-		if err != nil {
-			return err
-		}
-		data, err := api.NewPostService(c).Delete(postID)
 		if err != nil {
 			return err
 		}

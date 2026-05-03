@@ -48,6 +48,12 @@ func (s *PostService) List(params models.ListPostsParams) (*models.PostListRespo
 	if params.InstagramProfileID != "" {
 		q.Set("instagramProfileId", params.InstagramProfileID)
 	}
+	if params.TikTokProfileID != "" {
+		q.Set("tikTokProfileId", params.TikTokProfileID)
+	}
+	if params.YouTubeProfileID != "" {
+		q.Set("youTubeProfileId", params.YouTubeProfileID)
+	}
 	if params.LabelIDs != "" {
 		q.Set("labelIds", params.LabelIDs)
 	}
@@ -136,9 +142,8 @@ func (s *PostService) Get(id string) (*models.Post, error) {
 	return &wrapper.Post, nil
 }
 
-// Create creates a new post. Body is a map to accommodate the complex nested
-// channel configs (linkedIn, x, instagram). Minimum required fields: title,
-// publishAt, status.
+// Create creates a new post. Body is a map to accommodate complex nested
+// channel configs. Minimum required fields: title, publishAt, status.
 func (s *PostService) Create(body map[string]interface{}) (json.RawMessage, error) {
 	data, err := s.client.Post(postsBasePath, body)
 	if err != nil {
@@ -188,15 +193,6 @@ func (s *PostService) Unschedule(id string) (json.RawMessage, error) {
 	data, err := s.client.Post(postsBasePath+"/"+id+"/unschedule", nil)
 	if err != nil {
 		return nil, fmt.Errorf("unscheduling post: %w", err)
-	}
-	return data, nil
-}
-
-// Delete permanently deletes a post by ID.
-func (s *PostService) Delete(id string) (json.RawMessage, error) {
-	data, err := s.client.Delete(postsBasePath + "/" + id)
-	if err != nil {
-		return nil, fmt.Errorf("deleting post: %w", err)
 	}
 	return data, nil
 }

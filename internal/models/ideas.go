@@ -4,18 +4,20 @@ import "encoding/json"
 
 // Idea represents a content idea.
 type Idea struct {
-	ID         string          `json:"id"`
-	URL        string          `json:"url,omitempty"`
-	Title      string          `json:"title"`
-	Channels   []string        `json:"channels,omitempty"`
-	Status     string          `json:"status,omitempty"`
-	CreatedAt  string          `json:"createdAt,omitempty"`
-	UpdatedAt  string          `json:"updatedAt,omitempty"`
-	Labels     []Label         `json:"labels,omitempty"`
-	CampaignID string          `json:"campaignId,omitempty"`
-	LinkedIn   json.RawMessage `json:"linkedIn,omitempty"`
-	X          json.RawMessage `json:"x,omitempty"`
-	Instagram  json.RawMessage `json:"instagram,omitempty"`
+	ID            string          `json:"id"`
+	URL           string          `json:"url,omitempty"`
+	Title         string          `json:"title"`
+	Channels      []string        `json:"channels,omitempty"`
+	Status        string          `json:"status,omitempty"`
+	CreatedAt     string          `json:"createdAt,omitempty"`
+	UpdatedAt     string          `json:"updatedAt,omitempty"`
+	Labels        []Label         `json:"labels,omitempty"`
+	CampaignID    string          `json:"campaignId,omitempty"`
+	Notes         string          `json:"notes,omitempty"`
+	LinkedIn      json.RawMessage `json:"linkedIn,omitempty"`
+	X             json.RawMessage `json:"x,omitempty"`
+	TikTok        json.RawMessage `json:"tikTok,omitempty"`
+	YouTubeShorts json.RawMessage `json:"youTubeShorts,omitempty"`
 }
 
 // ListIdeasParams holds query parameters for listing ideas.
@@ -26,6 +28,8 @@ type ListIdeasParams struct {
 	Channel           string
 	LinkedInProfileID string
 	XProfileID        string
+	TikTokProfileID   string
+	YouTubeProfileID  string
 	LabelIDs          string
 	CreatedAtMin      string
 	CreatedAtMax      string
